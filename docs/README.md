@@ -1,5 +1,7 @@
 # ICC 文档
 
+> 这是旧 InkCanvasForClass 的文档，仅作历史参考。电子教鞭（ElectronicPointer）的跨平台架构说明见 [cross-platform-design.md](./cross-platform-design.md)，打包说明见 [../packaging/README.md](../packaging/README.md)。
+
 ## 开发
 
 本项目目前开发状态：
@@ -39,4 +41,4 @@ IccInkCanvas 的 Demo 测试。
 ICC 自己造了一套风格类似于 Gnome Gtk4 的 WPF 组件库，下面有具体每个控件的文档：
 
 1. [`ToggleSwitch`](./components/ToggleSwitch.md) Gtk.Switch 青春版，切换开关状态的按钮控件
-2. [`SegmentedButtons`]() 类似 Gtk.StackSwitcher 的分段单选按钮
+2. [`SegmentedButtons`](./components/SegmentedButtons.md) 类似 Gtk.StackSwitcher 的分段单选按钮

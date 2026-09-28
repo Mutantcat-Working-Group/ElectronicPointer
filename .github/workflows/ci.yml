@@ -1,0 +1,191 @@
+# Runs on every push and pull request: builds the solution on all three desktop hosts,
+# runs the test suite, and publishes one runtime per host to confirm the cross-platform
+# payload actually launches there.
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'codex/**'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The packaging scripts are the part a Windows workstation cannot exercise, so they get
+  # their own cheap job that parses them on Linux before anything else runs.
+  lint:
+    name: lint packaging scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: parse the shell scripts
+        run: |
+          set -euo pipefail
+          for script in \
+            packaging/linux/package.sh \
+            packaging/macos/package.sh \
+            packaging/linux/appimage/AppRun \
+            packaging/linux/debian/postinst \
+            packaging/linux/debian/prerm
+          do
+            bash -n "$script"
+            echo "parsed $script"
+          done
+
+      - name: shellcheck
+        run: |
+          shellcheck -S error \
+            packaging/linux/package.sh \
+            packaging/macos/package.sh \
+            packaging/linux/appimage/AppRun \
+            packaging/linux/debian/postinst \
+            packaging/linux/debian/prerm
+
+      - name: parse the powershell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($script in Get-ChildItem -Path packaging -Filter *.ps1 -Recurse) {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+                $script.FullName, [ref] $null, [ref] $errors) | Out-Null
+            if ($errors) {
+              $failed = $true
+              Write-Host "$($script.FullName):"
+              foreach ($error in $errors) {
+                Write-Host "  line $($error.Extent.StartLineNumber): $($error.Message)"
+              }
+            }
+            else {
+              Write-Host "parsed $($script.FullName)"
+            }
+          }
+          if ($failed) { throw 'one or more scripts did not parse' }
+
+      # publish.ps1 takes no channel argument any more: one build, one install. A call site
+      # that still passes one fails before anything else can catch it, and the grep covers
+      # the docs as well, so the flag cannot come back half documented.
+      - name: check the packaging contract
+        run: |
+          set -euo pipefail
+          # Matches the argument form a call site passes, not the word in a comment.
+          if grep -rnE -- '-Channel[[:space:]]' .github packaging; then
+            echo "::error::publish.ps1 takes no channel argument; drop it from every call site and doc"
+            exit 1
+          fi
+          # The installer has one target for all three payloads, and stock NSIS only ships a
+          # stub for that target. A move to amd64-unicode or arm64-unicode would break the
+          # hosted runner, which installs stock NSIS.
+          grep -rn -- '^Target ' packaging/windows/installer.nsi
+          grep -q 'Target x86-unicode' packaging/windows/installer.nsi || {
+            echo "::error::installer.nsi must keep the x86-unicode target, see the comment there"
+            exit 1
+          }
+
+  build:
+    name: build and test (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Each runner publishes the runtime it can actually launch, so the smoke step below
+          # exercises a real artifact instead of a cross-compiled one.
+          - os: windows-latest
+            rid: win-x64
+            executable: ElectronicPointer.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            executable: ElectronicPointer
+          - os: macos-latest
+            rid: osx-arm64
+            executable: ElectronicPointer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: restore
+        run: dotnet restore ElectronicPointer.sln
+
+      - name: build
+        run: dotnet build ElectronicPointer.sln --configuration Release --no-restore --nologo
+
+      # The solution has no platform-specific test project that needs a display: Core and
+      # Rendering are pure logic plus Skia, and Platform.Linux exercises the X11 key mapping
+      # and the autostart entry writer without opening a connection.
+      - name: test
+        run: dotnet test ElectronicPointer.sln --configuration Release --no-build --nologo
+
+      # No DateStamp is passed on purpose: the stamp is only meaningful once a tag fixes it,
+      # and CI wants the same "today" build a developer gets locally.
+      - name: publish the ${{ matrix.rid }} payload
+        run: |
+          pwsh packaging/publish.ps1 -Rid ${{ matrix.rid }}
+
+      # package.ps1 is the half of the chain that only a Windows host can run, so the Windows
+      # leg exercises it here over the payload it just published: the portable zip, the MSIX
+      # and the NSIS installer all come out of that one script and a broken step in it fails
+      # the job. The self-signed certificate the script mints when no .pfx is handed over is
+      # kept, because signing is part of what ships, and the artifacts themselves are not
+      # uploaded, the exit code is the whole point.
+      - name: package the windows payload
+        if: runner.os == 'Windows'
+        run: pwsh packaging/windows/package.ps1 -Rid ${{ matrix.rid }}
+
+      - name: confirm the windows artifacts
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(cat "artifacts/out/${{ matrix.rid }}/buildstamp.txt")
+          for name in \
+            "ElectronicPointer-$version-${{ matrix.rid }}.zip" \
+            "ElectronicPointer-$version-${{ matrix.rid }}.msix" \
+            "ElectronicPointer-$version-${{ matrix.rid }}-setup.exe"
+          do
+            if [ ! -f "artifacts/dist/$name" ]; then
+              echo "::error::missing artifacts/dist/$name"
+              ls -l artifacts/dist || true
+              exit 1
+            fi
+            echo "built $name ($(du -h "artifacts/dist/$name" | cut -f1))"
+          done
+
+      # --version is answered before Avalonia starts, so this needs no display, no X11 and
+      # no WindowServer, yet it still proves the native libraries resolved and the apphost
+      # is executable.
+      - name: smoke
+        run: artifacts/out/${{ matrix.rid }}/${{ matrix.executable }} --version
+
+      - name: record the payload summary
+        shell: bash
+        run: |
+          {
+            echo '# ${{ matrix.rid }} published payload'
+            echo
+            artifacts/out/${{ matrix.rid }}/${{ matrix.executable }} --version
+            echo
+            echo "$(find artifacts/out/${{ matrix.rid }} -type f | wc -l) files, $(du -sh artifacts/out/${{ matrix.rid }} | cut -f1)"
+          } > smoke.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ matrix.rid }}
+          path: smoke.txt
+          if-no-files-found: error

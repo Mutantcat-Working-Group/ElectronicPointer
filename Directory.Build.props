@@ -1,0 +1,43 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <DefaultItemExcludes>$(DefaultItemExcludes);*.DotSettings.user</DefaultItemExcludes>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>true</AppendRuntimeIdentifierToOutputPath>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+  </PropertyGroup>
+
+  <!-- Shared product identity. Packaging scripts read these values, so keep them in sync with AppIdentity.cs. -->
+  <PropertyGroup>
+    <Product>ElectronicPointer</Product>
+    <ProductChineseName>电子教鞭</ProductChineseName>
+    <Company>Mutantcat Working Group</Company>
+    <Authors>Mutantcat Working Group</Authors>
+    <RepositoryUrl>https://github.com/Mutantcat-Working-Group/ElectronicPointer</RepositoryUrl>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <ApplicationId>org.mutantcat.electronicpointer</ApplicationId>
+    <WindowsMsixIdentity>Mutantcat.ElectronicPointer</WindowsMsixIdentity>
+    <WindowsAumid>Mutantcat.ElectronicPointer.App</WindowsAumid>
+  </PropertyGroup>
+
+  <!-- Versioning: major.minor plus the date the build was stamped, e.g. 1.0.20260928.
+       Local builds stamp with today's date; releases pass -p:DateStamp=20260928 so the
+       artifacts can be reproduced byte for byte from the tag. AssemblyVersion stays at
+       1.0.0.0 because the date stamp changes every day and the CLR only allows four
+       numeric parts. -->
+  <PropertyGroup>
+    <VersionPrefix>1.0</VersionPrefix>
+    <DateStamp Condition="'$(DateStamp)' == ''">$([System.DateTime]::Now.ToString('yyyyMMdd'))</DateStamp>
+    <Version>$(VersionPrefix).$(DateStamp)</Version>
+    <AssemblyVersion>$(VersionPrefix).0.0</AssemblyVersion>
+    <FileVersion>$(VersionPrefix).0.0</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+</Project>

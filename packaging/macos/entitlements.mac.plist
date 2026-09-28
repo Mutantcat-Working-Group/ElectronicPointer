@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Signing entitlements. The application is not sandboxed: it captures the screen, sits
+     above other windows and takes over the keyboard, and a sandboxed build would have to
+     ask for every one of those powers. Only the hardened runtime exceptions .NET and Skia
+     actually need are listed.
+
+     Pass with: codesign --deep --force --options runtime \
+                     --entitlements packaging/macos/entitlements.mac.plist \
+                     --sign "Developer ID Application: ..." "ElectronicPointer.app"      -->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- The payload is a framework-dependent+contained tree: libSkiaSharp.dylib and the
+       libSystem.Native libraries are not signed by the same identity, and the hardened
+       runtime refuses to load them without this. -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+</dict>
+</plist>

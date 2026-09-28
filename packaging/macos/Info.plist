@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Template for the .app bundle. The packaging script substitutes @VERSION@ with the
+     same major.minor.YYYYMMDD stamp the managed assemblies carry, so the package, the
+     binary and the about box can never disagree. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>zh_CN</string>
+
+  <key>CFBundleDisplayName</key>
+  <string>电子教鞭</string>
+
+  <key>CFBundleExecutable</key>
+  <string>ElectronicPointer</string>
+
+  <key>CFBundleIconFile</key>
+  <string>electronicpointer.icns</string>
+
+  <!-- @APPID@ has to agree with AppIdentity.ApplicationId, which decides where the
+       configuration is kept. One build, one bundle id, no channel suffix. -->
+  <key>CFBundleIdentifier</key>
+  <string>@APPID@</string>
+
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+
+  <key>CFBundleName</key>
+  <string>ElectronicPointer</string>
+
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+
+  <key>CFBundleShortVersionString</key>
+  <string>@VERSION@</string>
+
+  <key>CFBundleVersion</key>
+  <string>@VERSION@</string>
+
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>MacOSX</string>
+  </array>
+
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.education</string>
+
+  <key>LSMinimumSystemVersion</key>
+  <string>12.0</string>
+
+  <key>NSHighResolutionCapable</key>
+  <true/>
+
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+
+  <!-- The pointer is a presenter's tool, so the window has to survive a display sleep and
+       must not be dimmed while the user is standing in front of a projector. -->
+  <key>NSSupportsSuddenTermination</key>
+  <false/>
+
+  <!-- Avalonia's Skia backend hands the JIT'ed generated code an executable page. Without
+       these two keys the app is killed by the kernel on a hardened runtime build. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+
+  <!-- Menu bar text is Chinese first. -->
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>zh_CN</string>
+    <string>en</string>
+  </array>
+</dict>
+</plist>

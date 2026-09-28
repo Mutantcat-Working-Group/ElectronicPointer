@@ -14,3 +14,9 @@
 /InkCanvasForClass.IccInkCanvas.Demo/bin
 /.vs
 /.idea
+
+# .NET build and publish output. Every build writes under artifacts/, so only the sources
+# under src/, tests/ and packaging/ are tracked.
+artifacts/
+bin/
+obj/

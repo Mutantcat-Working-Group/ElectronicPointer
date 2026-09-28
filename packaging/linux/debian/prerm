@@ -1,0 +1,22 @@
+#!/bin/sh
+# Run before the payload is removed. The payload, the launcher, the desktop entry and the
+# icons are all package owned and dpkg deletes them on its own. The one thing dpkg cannot
+# reach is the per-user autostart entry the application writes when the user asks it to
+# start at login, so remove that here instead of leaving a dead launcher behind.
+set -e
+
+APPID=org.mutantcat.electronicpointer
+
+for home in /root /home/*; do
+    [ -d "$home" ] || continue
+
+    entry="$home/.config/autostart/$APPID.desktop"
+    if [ -e "$entry" ]; then
+        rm -f -- "$entry" 2>/dev/null || true
+    fi
+done
+
+# The user's boards live under ~/.config/<appid> and are never touched: they belong to the
+# user, not to the package, and a reinstall must not wipe them.
+
+exit 0

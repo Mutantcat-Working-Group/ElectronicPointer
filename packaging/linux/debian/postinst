@@ -1,0 +1,30 @@
+#!/bin/sh
+# Run after the payload lands. Only the two caches every desktop reads are touched; the
+# application needs no configuration and starts a session the first time it is launched.
+set -e
+
+APPID=org.mutantcat.electronicpointer
+
+if [ -x /usr/bin/gtk-update-icon-cache ]; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+fi
+
+if [ -x /usr/bin/gtk4-update-icon-cache ]; then
+    gtk4-update-icon-cache -q -t -f /usr/share/icons/hicolor 2>/dev/null || true
+fi
+
+if [ -x /usr/bin/update-desktop-database ]; then
+    update-desktop-database -q /usr/share/applications 2>/dev/null || true
+fi
+
+if [ -x /usr/bin/appstreamcli ]; then
+    appstreamcli refresh-cache --force 2>/dev/null || true
+fi
+
+# A self-contained .NET build ships its own runtime, so there is nothing to link against
+# the host. The message below is the only output a user should ever need to read.
+echo "电子教鞭 (ElectronicPointer) 已安装。"
+echo "在应用菜单中搜索 电子教鞭，或直接运行 electronicpointer。"
+echo "当前会话为 Wayland 时，全局快捷键与屏幕捕获由合成器决定，详见 packaging/README.md。"
+
+exit 0

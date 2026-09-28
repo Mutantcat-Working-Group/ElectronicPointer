@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>ElectronicPointer</AssemblyName>
+    <RootNamespace>Mutantcat.ElectronicPointer.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- One icon for the whole product: the executable, the shortcuts, the installer and
+         the start menu entry all carry the same mark. The .ico itself is generated from
+         <repo>/icon.png by packaging/tools/generate-icons.ps1. -->
+    <ApplicationIcon>..\..\packaging\windows\assets\electronicpointer.ico</ApplicationIcon>
+    <BuiltInComInteropSupported>true</BuiltInComInteropSupported>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ElectronicPointer.Core\ElectronicPointer.Core.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Rendering\ElectronicPointer.Rendering.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.Abstractions\ElectronicPointer.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.Windows\ElectronicPointer.Platform.Windows.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.MacOS\ElectronicPointer.Platform.MacOS.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.Linux\ElectronicPointer.Platform.Linux.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- *.axaml is picked up automatically by the Avalonia targets; listing it here too
+         makes the compiler see App.axaml twice. -->
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ElectronicPointer.Core</AssemblyName>
+    <RootNamespace>Mutantcat.ElectronicPointer.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

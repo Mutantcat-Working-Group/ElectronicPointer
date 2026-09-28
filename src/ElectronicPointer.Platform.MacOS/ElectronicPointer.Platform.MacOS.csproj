@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ElectronicPointer.Platform.MacOS</AssemblyName>
+    <RootNamespace>Mutantcat.ElectronicPointer.Platform.MacOS</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ElectronicPointer.Core\ElectronicPointer.Core.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.Abstractions\ElectronicPointer.Platform.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

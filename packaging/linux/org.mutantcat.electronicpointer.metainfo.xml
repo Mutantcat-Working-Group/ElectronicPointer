@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata, shown by software centres and by flatpak-builder. Descriptions
+     stay in plain ASCII-safe Chinese because every consumer reads this file as UTF-8. -->
+<component type="desktop-application">
+  <id>org.mutantcat.electronicpointer</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0</project_license>
+
+  <name>电子教鞭</name>
+  <name xml:lang="en">ElectronicPointer</name>
+  <summary>在任何应用之上书写与批注的桌面电子教鞭</summary>
+  <summary xml:lang="en">Annotate and present on top of any application</summary>
+
+  <description>
+    <p>
+      电子教鞭把整个屏幕变成一块可写的板：切到画笔、荧光笔或板擦，就能在幻灯片、代码和
+      网页上直接标注，画错了随时撤销，讲完一段就翻到下一页。
+    </p>
+    <p xml:lang="en">
+      ElectronicPointer turns the whole screen into a writable board. Switch to the pen, the
+      highlighter or the eraser and annotate slides, code and web pages directly, undo as
+      often as you like, and move on to the next page when a section is done.
+    </p>
+    <p>
+      画面可以随时冻结成背景继续批注，工具栏和画板各自独立开关，鼠标事件可以穿过画板作用
+      在背后的应用上。批注内容保存在本机,不会上传到任何地方。
+    </p>
+  </description>
+
+  <launchable type="desktop-id">org.mutantcat.electronicpointer.desktop</launchable>
+
+  <url type="homepage">https://github.com/Mutantcat-Working-Group/ElectronicPointer</url>
+  <url type="bugtracker">https://github.com/Mutantcat-Working-Group/ElectronicPointer/issues</url>
+  <url type="vcs-browser">https://github.com/Mutantcat-Working-Group/ElectronicPointer</url>
+
+  <developer id="org.mutantcat">
+    <name>Mutantcat Working Group</name>
+  </developer>
+
+  <categories>
+    <category>Education</category>
+    <category>Office</category>
+    <category>Presentation</category>
+    <category>Graphics</category>
+  </categories>
+
+  <keywords>
+    <keyword lang="zh_CN">教鞭</keyword>
+    <keyword lang="zh_CN">批注</keyword>
+    <keyword lang="zh_CN">荧光笔</keyword>
+    <keyword>pointer</keyword>
+    <keyword>annotation</keyword>
+    <keyword>whiteboard</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1" />
+
+  <provides>
+    <binary>electronicpointer</binary>
+  </provides>
+
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+</component>

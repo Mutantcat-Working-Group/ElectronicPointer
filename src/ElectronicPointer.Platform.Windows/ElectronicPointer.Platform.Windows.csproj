@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ElectronicPointer.Platform.Windows</AssemblyName>
+    <RootNamespace>Mutantcat.ElectronicPointer.Platform.Windows</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ElectronicPointer.Core\ElectronicPointer.Core.csproj" />
+    <ProjectReference Include="..\ElectronicPointer.Platform.Abstractions\ElectronicPointer.Platform.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

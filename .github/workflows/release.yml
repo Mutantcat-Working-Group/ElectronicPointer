@@ -1,0 +1,230 @@
+# Cuts a release from a tag. The tag carries both the version and the build stamp, so the
+# signing identity, the package name and the configuration directory all agree without
+# anyone passing anything extra:
+#
+#   v1.0.20260928           one release, three platforms, no channels
+#
+# A tag without a yyyyMMdd stamp is rejected on purpose: installed builds read their stamp
+# back out of the assembly, and the deb, the AppImage and the dmg get their name from it too.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: resolve the version from the tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      stamp: ${{ steps.resolve.outputs.stamp }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
+    steps:
+      - name: resolve
+        id: resolve
+        run: |
+          set -euo pipefail
+          # 1.0.20260928, or 1.0.20260928-rc.1 for a release candidate, which is still one
+          # version and one install, only flagged as a prerelease on the release page.
+          core="${GITHUB_REF_NAME#v}"
+          version="${core%%-*}"           # 1.0.20260928
+          stamp="${version##*.}"          # 20260928
+          case "$core" in
+            *-*)     prerelease=true ;;
+            *)       prerelease=false ;;
+          esac
+          echo "tag=$GITHUB_REF_NAME version=$version stamp=$stamp"
+          if ! printf '%s' "$stamp" | grep -Eq '^[0-9]{8}$'; then
+            echo "::error::$GITHUB_REF_NAME does not carry a yyyyMMdd stamp, expected something like v1.0.20260928"
+            exit 1
+          fi
+          echo "version=$version"    >> "$GITHUB_OUTPUT"
+          echo "stamp=$stamp"        >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: linux-${{ matrix.rid }}
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: preflight
+        run: |
+          set -euo pipefail
+          for tool in dpkg-deb curl tar du awk sed; do
+            command -v "$tool" >/dev/null || { echo "missing $tool"; exit 1; }
+            echo "found $(command -v "$tool")"
+          done
+
+      - name: publish
+        run: |
+          pwsh packaging/publish.ps1 \
+            -Rid ${{ matrix.rid }} \
+            -DateStamp ${{ needs.version.outputs.stamp }}
+
+      # appimagetool is downloaded and then extracted rather than mounted, because a runner
+      # has no FUSE device. Everything else it needs is already on the image.
+      - name: package
+        run: bash packaging/linux/package.sh ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+
+  macos:
+    name: macOS-${{ matrix.rid }}
+    needs: version
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: osx-arm64
+          - rid: osx-x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: publish
+        run: |
+          pwsh packaging/publish.ps1 \
+            -Rid ${{ matrix.rid }} \
+            -DateStamp ${{ needs.version.outputs.stamp }}
+
+      # The four Apple variables are only read when they are non-empty, so the step builds an
+      # unsigned bundle on a fork or a person with no developer account and signs and
+      # notarizes when the secrets exist. See packaging/README.md.
+      - name: package
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: bash packaging/macos/package.sh ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.rid }}
+          path: artifacts/dist/**
+          if-no-files-found: error
+
+  windows:
+    name: windows-${{ matrix.rid }}
+    needs: version
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The installer is one 32 bit NSIS binary for all three payloads, and it installs
+        # the 64 bit and the ARM64 trees into $PROGRAMFILES64 with the 64 bit registry view,
+        # so a 32 bit payload and a 64 bit one never collide. See installer.nsi.
+        rid: [win-x64, win-x86, win-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: publish
+        run: |
+          pwsh packaging/publish.ps1 `
+            -Rid ${{ matrix.rid }} `
+            -DateStamp ${{ needs.version.outputs.stamp }}
+
+      # The publisher of the MSIX identity is taken from the certificate when there is one,
+      # because makeappx records the subject signtool later proves and the two have to agree.
+      # With no secret the script mints a self-signed certificate instead and signs with that,
+      # so a release always carries a signature; only a real certificate spares the user the
+      # "do you trust this publisher" prompt, so keep it on the release repo.
+      - name: package
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $packageArgs = @{ Rid = '${{ matrix.rid }}' }
+          if ($env:WINDOWS_CERTIFICATE_BASE64) {
+            $pfx = Join-Path '${{ runner.temp }}' 'electronicpointer.pfx'
+            [System.IO.File]::WriteAllBytes(
+                $pfx, [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+            $packageArgs['CertificatePath'] = $pfx
+            $packageArgs['CertificatePassword'] = $env:WINDOWS_CERTIFICATE_PASSWORD
+          }
+          else {
+            Write-Warning 'no certificate was supplied, the release will be unsigned'
+          }
+          & 'packaging/windows/package.ps1' @packageArgs
+
+      # The three architectures each produce their own installer, and a missing installer is
+      # easy to miss in a log full of makensis output, so the release fails here instead of
+      # quietly shipping a Windows release without one.
+      - name: confirm the installers
+        shell: pwsh
+        run: |
+          $version = (Get-Content "artifacts/out/${{ matrix.rid }}/buildstamp.txt" -Raw).Trim()
+          foreach ($name in @(
+              "ElectronicPointer-$version-${{ matrix.rid }}.zip",
+              "ElectronicPointer-$version-${{ matrix.rid }}.msix",
+              "ElectronicPointer-$version-${{ matrix.rid }}-setup.exe") ) {
+            $path = Join-Path 'artifacts/dist' $name
+            if (-not (Test-Path -LiteralPath $path)) {
+              throw "missing $path"
+            }
+            Write-Host ("built {0} ({1:N1} MB)" -f $name, ((Get-Item -LiteralPath $path).Length / 1MB))
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.rid }}
+          path: artifacts/dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish the GitHub release
+    needs: [version, linux, macos, windows]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: list what was collected
+        run: find dist -type f | sort | sed 's/^/  /'
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: ElectronicPointer ${{ needs.version.outputs.version }}
+          prerelease: ${{ needs.version.outputs.prerelease }}
+          make_latest: true
+          generate_release_notes: true
+          files: |
+            dist/**/*.deb
+            dist/**/*.AppImage
+            dist/**/*.tar.gz
+            dist/**/*.dmg
+            dist/**/*.zip
+            dist/**/*.msix
+            dist/**/*.exe

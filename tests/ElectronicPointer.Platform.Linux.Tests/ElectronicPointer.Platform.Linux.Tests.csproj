@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ElectronicPointer.Platform.Linux.Tests</AssemblyName>
+    <RootNamespace>Mutantcat.ElectronicPointer.Platform.Linux.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ElectronicPointer.Core\ElectronicPointer.Core.csproj" />
+    <ProjectReference Include="..\..\src\ElectronicPointer.Platform.Abstractions\ElectronicPointer.Platform.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\ElectronicPointer.Platform.Linux\ElectronicPointer.Platform.Linux.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

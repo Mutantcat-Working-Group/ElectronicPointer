@@ -1,0 +1,8 @@
+#!/bin/sh
+# Entry point of an assembled AppDir. The payload is self-contained and is mounted read-only,
+# which is exactly what it wants: .NET resolves libSkiaSharp from the directory sitting next
+# to the managed assemblies, so nothing has to be extracted or relocated first.
+set -e
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+exec "$HERE/usr/bin/ElectronicPointer" "$@"

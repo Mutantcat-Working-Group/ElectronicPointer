@@ -1,0 +1,13 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Mutantcat.ElectronicPointer.App.App"
+             RequestedThemeVariant="Light">
+
+  <!-- The overlay has to stay light on every platform: a dark theme would make the ink
+       unreadable on a projected slide, and the toolbar is the only surface that ever
+       shows a theme at all. -->
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+
+</Application>

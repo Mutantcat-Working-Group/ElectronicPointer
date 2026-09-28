@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MSIX manifest for the Windows package. The Identity Name and the Application Id together
+     form Mutantcat.ElectronicPointer.App, which is the AUMID AppIdentity.WindowsAumid
+     advertises; keep the three in step. @PUBLISHER@ is substituted from the signing
+     certificate at pack time, because makeappx records the subject that signtool later
+     proves, and the two have to agree. The tile assets live in
+     packaging/windows/assets and come from the same source PNG as the hicolor icons.
+
+     @BUILD@ is the number of days since 2020-01-01 rather than the yyyyMMdd stamp itself:
+     the schema caps each version field at 65535, and 202609 does not fit. Counting days
+     keeps the package version ordered the same way the stamp is. -->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap rescap">
+
+  <Identity Name="Mutantcat.ElectronicPointer"
+            Publisher="@PUBLISHER@"
+            Version="1.0.@BUILD@.@REVISION@"
+            ProcessorArchitecture="@ARCH@" />
+
+  <Properties>
+    <DisplayName>电子教鞭</DisplayName>
+    <PublisherDisplayName>Mutantcat Working Group</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>在任意应用之上书写、圈画与演示的桌面电子教鞭。</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Applications>
+    <Application Id="App"
+                 Executable="ElectronicPointer.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="电子教鞭"
+                          Description="在任意应用之上书写、圈画与演示的桌面电子教鞭。"
+                          BackgroundColor="transparent"
+                          Square44x44Logo="Assets\Square44x44Logo.png"
+                          Square150x150Logo="Assets\Square150x150Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
+                         Square310x310Logo="Assets\Square310x310Logo.png">
+          <uap:ShowNameOnTiles>
+            <uap:ShowOn Tile="square150x150Logo" />
+          </uap:ShowNameOnTiles>
+        </uap:DefaultTile>
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- The application draws over other windows, hooks the keyboard and captures the
+         screen. A packaged desktop app needs the full trust capability to do any of it. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>
