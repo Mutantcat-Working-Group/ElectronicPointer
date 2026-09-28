@@ -296,6 +296,12 @@ jobs:
       # has to carry the Applications drop link, the bundle inside has to prove the ad-hoc
       # signature the script claims, and on the architecture the runner can launch the
       # bundled executable still answers --version.
+      #
+      # The image is attached to an empty directory of our own instead of being parsed
+      # out of hdiutil's plist: an image with a partition table lists the whole disk as
+      # the first system entity and that entry carries no mount-point key, so a fixed
+      # :system-entities:0 index does not resolve. -mountpoint puts the volume exactly
+      # where the checks below look for it.
       - name: confirm the macos artifacts
         if: runner.os == 'macOS'
         run: |
@@ -308,11 +314,11 @@ jobs:
             exit 1
           fi
           echo "built $dmg ($(du -h "$dmg" | cut -f1))"
-          plist="$RUNNER_TEMP/ep-attach.plist"
-          hdiutil attach -nobrowse -plist "$dmg" > "$plist"
-          mountpoint="$(/usr/libexec/PlistBuddy \
-            -c 'Print :system-entities:0:mount-point' "$plist")"
-          trap 'hdiutil detach "$mountpoint" >/dev/null 2>&1 || true' EXIT
+          mountpoint="$RUNNER_TEMP/ep-mount"
+          rm -rf "$mountpoint"
+          mkdir -p "$mountpoint"
+          hdiutil attach -nobrowse -mountpoint "$mountpoint" "$dmg"
+          trap 'hdiutil detach "$mountpoint" >/dev/null 2>&1 || hdiutil detach "$mountpoint" -force >/dev/null 2>&1 || true' EXIT
           echo "mounted $dmg at $mountpoint"
           if [ ! -L "$mountpoint/Applications" ]; then
             echo "::error::the volume has no Applications drop link"
