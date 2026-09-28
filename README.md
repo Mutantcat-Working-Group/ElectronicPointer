@@ -63,6 +63,7 @@ ElectronicPointer · 跨平台桌面电子教鞭与批注 · [English](./README.
 1. macOS 首次启动若被 Gatekeeper 拦下，执行一次 `xattr -cr /Applications/ElectronicPointer.app`。
 2. Windows 安装包使用自签名证书，SmartScreen 会询问一次是否信任该发布者。
 3. Linux 下 X11 会话功能完整；Wayland 会话下部分能力受合成器限制，不可用时改用 X11 会话。
+4. Linux 的 deb 依赖 X11 客户端库、fontconfig 和 libGL，apt 会自动装上；AppImage 与 tar.gz 不带安装步骤，需要系统里已有这些库，桌面环境默认都有。
 
 ### 四、快速上手
 

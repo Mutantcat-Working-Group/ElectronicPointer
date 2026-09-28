@@ -25,6 +25,6 @@ fi
 # the host. The message below is the only output a user should ever need to read.
 echo "电子教鞭 (ElectronicPointer) 已安装。"
 echo "在应用菜单中搜索 电子教鞭，或直接运行 electronicpointer。"
-echo "当前会话为 Wayland 时，全局快捷键与屏幕捕获由合成器决定，详见 packaging/README.md。"
+echo "当前会话为 Wayland 时，全局快捷键与屏幕捕获由合成器决定，那种会话下请改用 X11。"
 
 exit 0

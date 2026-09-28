@@ -93,7 +93,19 @@ public sealed class ToolbarWindow : Window
             MaxWidth = Math.Max(MinWidth, screen.WorkingArea.Width - 48);
 
         Position = PreferredPosition();
+        // The height that placement was computed from is still the pre-layout default
+        // here; the content-sized height only arrives with the first layout pass. Without
+        // the second placement the palette keeps a position derived from a height the
+        // window never had and drifts away from the bottom edge, which is what X11 and
+        // AppKit both show because they map the window before that pass runs.
+        LayoutUpdated += OnLayoutUpdated;
         Opacity = 1;
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        LayoutUpdated -= OnLayoutUpdated;
+        Position = PreferredPosition();
     }
 
     /// <summary>Bottom centre of the primary screen's usable area, clamped so the whole palette stays on screen.</summary>

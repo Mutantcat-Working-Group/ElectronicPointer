@@ -63,6 +63,7 @@ Grab your platform from [Releases](https://github.com/Mutantcat-Working-Group/El
 1. If Gatekeeper stops the first launch on macOS, run `xattr -cr /Applications/ElectronicPointer.app` once.
 2. The Windows installers are self-signed, so SmartScreen asks once whether you trust the publisher.
 3. On Linux an X11 session is fully supported; some capabilities depend on the compositor under Wayland, so use an X11 session when they are unavailable.
+4. The Linux deb needs the X11 client libraries, fontconfig and libGL, and apt pulls them in; the AppImage and the tarball install nothing and expect those libraries to be present already, which any desktop environment takes care of.
 
 ### 4. Quick Start
 

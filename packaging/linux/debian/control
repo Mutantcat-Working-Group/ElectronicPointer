@@ -5,15 +5,17 @@ Section: education
 Priority: optional
 Maintainer: Mutantcat Working Group <mutantcat-working-group@users.noreply.github.com>
 Homepage: https://github.com/Mutantcat-Working-Group/ElectronicPointer
-Depends: libc6 (>= 2.26), libgcc-s1, libstdc++6, zlib1g, libx11-6, libxext6, libxinerama1, libfontconfig1
-Recommends: libice6, libsm6
+Depends: libc6 (>= 2.34), libgcc-s1 (>= 3.0), libstdc++6 (>= 5.2), libfontconfig1 (>= 2.12.6), libx11-6, libxext6, libxi6, libxrandr2, libxinerama1, libxcursor1, libgl1
+Recommends: libice6, libsm6, libgtk-3-0t64 | libgtk-3-0
 Installed-Size: @SIZE@
-Description: ElectronicPointer, a desktop electronic pointer
+Description: On-screen electronic pointer for teaching and demos
  电子教鞭把整块屏幕变成可写的板：切到画笔、荧光笔或板擦，就能在幻灯片、
  代码和网页上直接标注，画错了随时撤销，讲完一段就翻到下一页。
  .
  画面可以随时冻结成背景继续批注，工具栏与画板各自独立开关，鼠标事件也能穿过
  画板作用在背后的应用上。批注数据只保存在本机用户目录，不上传任何地方。
  .
- 本包自带 .NET 运行时，只依赖 X11 的共享库；这些库在几乎每个桌面发行版上都有，
- 但 Wayland 会话下的全局快捷键与屏幕捕获能力仍受合成器限制。
+ 包内自带 .NET 运行时与 Skia、Avalonia 的原生库，运行时仍需 X11 客户端库、
+ fontconfig 字体栈和 libGL，桌面发行版通常由 Mesa 提供；没有 OpenGL 的机器会退回
+ 软件光栅化，界面照旧可用，只是更吃 CPU。X11 会话下功能完整，Wayland 会话下的
+ 全局快捷键与屏幕捕获能力则取决于合成器。

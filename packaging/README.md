@@ -38,7 +38,15 @@ bash packaging/linux/package.sh linux-x64
 
 三种产物装出来的可执行文件路径一致，都是 `/usr/lib/electronicpointer/ElectronicPointer`。应用在设置里打开「开机自启」时写的是 `~/.config/autostart/org.mutantcat.electronicpointer.desktop`，指向这个路径，所以无论用哪一种装上，自启都对。
 
-`debian/control` 里的 `@VERSION@`、`@ARCH@` 和 `@SIZE@` 由脚本按编译戳、架构和 `du -sk` 的真实体积替换。依赖只列 X11 那几个共享库：程序自带的 .NET 运行时里已经包含了 Skia 和 Avalonia 的原生库。
+`debian/control` 里的 `@VERSION@`、`@ARCH@` 和 `@SIZE@` 由脚本按编译戳、架构和 `du -sk` 的真实体积替换。
+
+依赖分两段得出。`libc6`、`libgcc-s1`、`libstdc++6`、`libfontconfig1` 连版本下界都是 `dpkg-shlibdeps` 在发布输出上算出来的：自带运行时、Skia、HarfBuzz 里只有这几个原生库按 ELF 名链到系统库上。剩下的必须手写，因为 Avalonia 和 Skia 是在托管侧 `dlopen` 平台库的，`readelf -d` 只列得出一堆 `libdl`/`libpthread`，`dpkg-shlibdeps` 也就看不见它们——看不见不等于不需要，窗口建不起来就是因为漏了。清单是照着托管程序集里出现的 soname 逐个核出来的：`libX11.so.6`、`libXext.so.6`、`libXi.so.6`、`libXrandr.so.2`、`libXinerama.so.1`、`libXcursor.so.1`、`libGL.so.1`，加上 Skia 直接链上的 `libfontconfig.so.1`。`libx11-xcb` 和 `libxcb` 不用写，`libgl1` 会把 Mesa 那一栈（`libGLX`、`libglx-mesa0`、`libdrm`、`libllvm`）连同它们一起传递进来。Vulkan 也不写：`libvulkan.so.1` 只在真的去建 Vulkan surface 时才会加载，而这个应用走 Skia 的 GL 后端。
+
+`libICE`/`libSM` 和 GTK3 放在 Recommends。文件选择框优先走 XDG 门户，没有门户的会话才回落到 `Avalonia.X11` 自带的 GTK 实现，所以 GTK 是「装了更好」而不是必须；前两个 soname X11 后端自己也引用。Ubuntu 24.04 的 time_t 迁移把 GTK 改名成 `libgtk-3-0t64`，Debian 那边还叫 `libgtk-3-0`，于是写成 `libgtk-3-0t64 | libgtk-3-0`，两边都能装上。libc/libstdc++ 的下界取自构建机（Ubuntu 24.04）上 dpkg-shlibdeps 的结果，也就是 Ubuntu 22.04 与 Debian 12 起步。
+
+AppImage 和 tar.gz 不声明任何依赖，把这些库留给宿主的桌面环境：装 deb 的机器上 apt 会补齐，能跑 AppImage 的桌面本来就带着。
+
+deb 在干净容器里实测过两遍：`apt-get install ./electronicpointer_*.deb` 一次带 Recommends（171 个包，GTK3 和 Mesa 都在内），一次 `--no-install-recommends`（52 个包）。两次都没有 unmet dependencies，`apt-get check` 干净，`/usr/bin/electronicpointer --version` 都出版本号，Xvfb 下启动后工具栏落在屏幕底部中间（`860x166+370+802`）。
 
 `appimagetool` 是现场下载的。CI 的 runner 上没有 FUSE 设备，所以脚本把它 `--appimage-extract` 解开之后直接执行 `squashfs-root/AppRun`，而不是把它挂载起来。
 
@@ -140,7 +148,7 @@ pwsh packaging/windows/package.ps1 -Rid win-x64 `
 
 CI 的 `build` job 把六个 RID（`win-x64`、`win-x86`、`win-arm64`、`linux-x64`、`osx-x64`、`osx-arm64`）在三个真机镜像上全都跑到过：`windows-latest`、`ubuntu-latest`、`macos-latest`（具体镜像号随 GitHub 更新而变，写死没有意义）上 restore → build → test（110 个）→ publish → 打包 → 校验。`lint` job 对全部脚本做 `bash -n`、`shellcheck` 和打包契约检查，那只是静态把关，下面写的产出是真实执行的结果。
 - Windows：三个架构的便携 zip、MSIX、NSIS 安装包都真的打出来并签了名（没有证书时是现场生成的 `CN=Mutantcat Working Group` 自签名证书），三个产物逐一断言存在。
-- Linux：`linux/package.sh` 在 runner 上真实执行，deb、AppImage、tar.gz 三个产物逐一断言存在；AppImage 还用 `--appimage-extract` 解开（runner 没有 FUSE，挂不起来），直接跑镜像里的 `AppRun --version`，「解压即用」是验过的，不是写在文档上的。
+- Linux：`linux/package.sh` 在 runner 上真实执行，deb、AppImage、tar.gz 三个产物逐一断言存在；AppImage 还用 `--appimage-extract` 解开（runner 没有 FUSE，挂不起来），直接跑镜像里的 `AppRun --version`，「解压即用」是验过的，不是写在文档上的。deb 的依赖链另在本地干净容器（Ubuntu 24.04）里装过：带 Recommends 与 `--no-install-recommends` 各一次，都没有未满足依赖，装好之后从 `/usr/bin/electronicpointer` 启动，工具栏位置与 Xvfb 屏幕尺寸对得上。
 - macOS：`macos/package.sh` 在 runner 上真实执行，两个架构的 `.app` 和 `.dmg` 都出了；CI 把 dmg 挂载起来，验过里面的 `Applications` 是指向 `/Applications` 的软链、验过 bundle 带 ad-hoc 签名，arm64 的那一份还从挂载的镜像里直接启动过。
 - `win-arm64` 和 `osx-x64` 在 runner 上没有对应硬件（x64 Windows 跑不了 ARM64 程序，arm64 的 macOS 镜像不带 Rosetta），这两个 payload 照常发布、打包、校验产物，只是不启动，`smoke` 步骤对它们自动跳过；`win-x86` 靠 WoW64 能启动，冒烟照旧。
 
