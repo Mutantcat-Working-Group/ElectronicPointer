@@ -1,17 +1,6 @@
-﻿/InkCanvasForClass/obj
-/InkCanvasForClass/bin
-/InkCanvasForClassX/obj
-/InkCanvasForClassX/bin
-/InkCanvasForClass.IACoreHelper/obj
-/InkCanvasForClass.IACoreHelper/bin
-/InkCanvasForClass.PowerPoint.InteropHelper/obj
-/InkCanvasForClass.PowerPoint.InteropHelper/bin
-/InkCanvasForClass.PowerPoint.Vsto/obj
-/InkCanvasForClass.PowerPoint.Vsto/bin
-/InkCanvasForClass.IccInkCanvas/obj
-/InkCanvasForClass.IccInkCanvas/bin
-/InkCanvasForClass.IccInkCanvas.Demo/obj
-/InkCanvasForClass.IccInkCanvas.Demo/bin
+# The retired Windows implementation lives under old/. The generic bin/ and obj/ rules
+# below already cover it, so no per-project entries are needed.
+
 /.vs
 /.idea
 

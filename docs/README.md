@@ -1,6 +1,7 @@
 # ICC 文档
 
 > 这是旧 InkCanvasForClass 的文档，仅作历史参考。电子教鞭（ElectronicPointer）的跨平台架构说明见 [cross-platform-design.md](./cross-platform-design.md)，打包说明见 [../packaging/README.md](../packaging/README.md)。
+> 另外：这些旧工程的代码已经从仓库根搬到 old/ 目录下，本文件描述的目录结构以 old/ 为根。
 
 ## 开发
 

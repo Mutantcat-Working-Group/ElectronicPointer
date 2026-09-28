@@ -113,8 +113,7 @@ C# 命名空间用 `Mutantcat.ElectronicPointer` 而不是 `org.mutantcat.xxx`�
 `AppIdentity` 同时带版本号：`1.0.<yyyymmdd>`，和包名同源。`AssemblyVersion` 固定 `1.0.0.0`，`InformationalVersion` 带日期戳，`--version` 读的是后者。
 
 ## 旧目录
-
-仓库根下的 `InkCanvasForClass*` 和 `InkCanvasForClassX` 七个目录是旧 Windows 实现，仍然保留，作为交互细节和算法的参考。新工程全部在 `src/`、`tests/` 和 `packaging/` 下，构建它们不是本项目的目标。
+旧 Windows 实现整体搬到了 `old/` 下：主程序 `InkCanvasForClass`、控件 `InkCanvasForClass.IccInkCanvas` 及其 Demo、IACore 封装、两个 PowerPoint 工程，以及中途废弃的 `InkCanvasForClassX`，外加旧的解决方案和截图。目录从仓库根挪走，是为了让根目录只剩电子教鞭自己的东西；内容一行没动，仍作为交互细节和算法的参考。它不参与构建，`ElectronicPointer.sln` 里没有任何一项指向它。新工程全部在 `src/`、`tests/` 和 `packaging/` 下。
 
 ## 测试
 
