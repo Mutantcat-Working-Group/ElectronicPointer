@@ -1,11 +1,10 @@
-Source: electronicpointer
+Package: electronicpointer
+Version: @VERSION@
+Architecture: @ARCH@
 Section: education
 Priority: optional
 Maintainer: Mutantcat Working Group <mutantcat-working-group@users.noreply.github.com>
 Homepage: https://github.com/Mutantcat-Working-Group/ElectronicPointer
-
-Package: electronicpointer
-Architecture: @ARCH@
 Depends: libc6 (>= 2.26), libgcc-s1, libstdc++6, zlib1g, libx11-6, libxext6, libxinerama1, libfontconfig1
 Recommends: libice6, libsm6
 Installed-Size: @SIZE@

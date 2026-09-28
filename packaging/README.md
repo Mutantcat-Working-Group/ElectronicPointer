@@ -38,9 +38,11 @@ bash packaging/linux/package.sh linux-x64
 
 三种产物装出来的可执行文件路径一致，都是 `/usr/lib/electronicpointer/ElectronicPointer`。应用在设置里打开「开机自启」时写的是 `~/.config/autostart/org.mutantcat.electronicpointer.desktop`，指向这个路径，所以无论用哪一种装上，自启都对。
 
-`debian/control` 里的 `@ARCH@` 和 `@SIZE@` 由脚本按架构和 `du -sk` 的真实体积替换。依赖只列 X11 那几个共享库：程序自带的 .NET 运行时里已经包含了 Skia 和 Avalonia 的原生库。
+`debian/control` 里的 `@VERSION@`、`@ARCH@` 和 `@SIZE@` 由脚本按编译戳、架构和 `du -sk` 的真实体积替换。依赖只列 X11 那几个共享库：程序自带的 .NET 运行时里已经包含了 Skia 和 Avalonia 的原生库。
 
 `appimagetool` 是现场下载的。CI 的 runner 上没有 FUSE 设备，所以脚本把它 `--appimage-extract` 解开之后直接执行 `squashfs-root/AppRun`，而不是把它挂载起来。
+
+AppImage 那一侧还有两条 AppDir 约定：`.desktop` 菜单项和 `Icon=` 指向的 PNG 必须同时出现在 AppDir 根目录，appimagetool 只从那里找，`usr/share/applications` 里那份是给装进系统的 deb 用的。`appimagetool` 另外要求系统里有 `file` 命令，CI 检测到缺失时会先装上，lint job 还会用 `desktop-file-validate` 校验菜单项，重复的条目组或写错的字段码在那里就会失败。
 
 ## macOS
 

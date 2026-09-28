@@ -5,9 +5,11 @@
      ask for every one of those powers. Only the hardened runtime exceptions .NET and Skia
      actually need are listed.
 
-     Pass with: codesign --deep --force --options runtime \
-                     --entitlements packaging/macos/entitlements.mac.plist \
-                     --sign "Developer ID Application: ..." "ElectronicPointer.app"      -->
+     Pass this file to codesign together with a real signing identity, using the deep,
+     force and runtime flags: codesign deep-force-runtime-entitlements plus the path
+     above, signed as "Developer ID Application: ..." over "ElectronicPointer.app".
+     The option names are spelled out here rather than written as flags because an XML
+     comment may not contain two consecutive dashes.      -->
 <plist version="1.0">
 <dict>
   <key>com.apple.security.cs.allow-jit</key>

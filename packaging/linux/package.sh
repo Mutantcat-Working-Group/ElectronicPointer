@@ -82,7 +82,7 @@ stage_tree "$DEBROOT"
 mkdir -p "$DEBROOT/DEBIAN"
 chmod 755 "$DEBROOT/DEBIAN"
 INSTALLED_KB="$(du -sk "$DEBROOT/usr" | awk '{print $1}')"
-sed -e "s/@ARCH@/$ARCH/" -e "s/@SIZE@/$INSTALLED_KB/" \
+sed -e "s/@VERSION@/$VERSION/" -e "s/@ARCH@/$ARCH/" -e "s/@SIZE@/$INSTALLED_KB/" \
     "$ROOT/packaging/linux/debian/control" > "$DEBROOT/DEBIAN/control"
 install -Dm755 "$ROOT/packaging/linux/debian/postinst" "$DEBROOT/DEBIAN/postinst"
 install -Dm755 "$ROOT/packaging/linux/debian/prerm" "$DEBROOT/DEBIAN/prerm"
@@ -102,11 +102,19 @@ ln -sfn "../lib/$PKGNAME/ElectronicPointer" "$APPDIR/$LAUNCHER"
 
 install -Dm644 "$ROOT/packaging/linux/$APPID.desktop" \
     "$APPDIR/usr/share/applications/$APPID.desktop"
+# appimagetool reads the menu entry from the AppDir root, not from usr/share/applications,
+# so the same file is staged in both places: once where an installed system expects it,
+# once where the image builder looks for it.
+install -m644 "$ROOT/packaging/linux/$APPID.desktop" "$APPDIR/$APPID.desktop"
 for size in 16 24 32 48 64 128 256; do
     install -Dm644 "$ROOT/packaging/assets/icons/hicolor/${size}x${size}/apps/$APPID.png" \
         "$APPDIR/usr/share/icons/hicolor/${size}x${size}/apps/$APPID.png"
 done
 
+# appimagetool resolves the Icon= key of the menu entry against the AppDir root, so the
+# hicolor 256x256 asset is staged under its icon name as well.
+install -m644 "$ROOT/packaging/assets/icons/hicolor/256x256/apps/$APPID.png" \
+    "$APPDIR/$APPID.png"
 install -m644 "$ROOT/icon.png" "$APPDIR/.DirIcon"
 install -Dm755 "$ROOT/packaging/linux/appimage/AppRun" "$APPDIR/AppRun"
 

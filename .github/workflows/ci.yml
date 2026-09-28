@@ -97,6 +97,15 @@ jobs:
             exit 1
           }
 
+      # The menu entry is the one packaging asset no Windows workstation can inspect, and a
+      # duplicated group or a stray field code hides in it silently. desktop-file-validate
+      # exits non-zero on those, so the mistake cannot reach a package.
+      - name: validate the desktop entry
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq desktop-file-utils
+          desktop-file-validate packaging/linux/*.desktop
   build:
     name: build and test (${{ matrix.rid }})
     runs-on: ${{ matrix.os }}
@@ -216,6 +225,20 @@ jobs:
       # release. appimagetool is downloaded and then extracted rather than mounted, because
       # the runner has no FUSE device, and the tool brings its own mksquashfs, so squashfs
       # tools never have to be installed.
+      # The file command is the one external dependency appimagetool refuses to start
+      # without, and the hosted Ubuntu image is not guaranteed to ship it, so it is
+      # installed only on the images that lack it.
+      - name: ensure appimagetool can identify files
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          if command -v file >/dev/null 2>&1; then
+            echo "file is present at $(command -v file)"
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq file
+          fi
+          file --version | head -1
       - name: package the linux payload
         if: runner.os == 'Linux'
         run: bash packaging/linux/package.sh ${{ matrix.rid }}
