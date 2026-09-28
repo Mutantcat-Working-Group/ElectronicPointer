@@ -136,4 +136,4 @@ pwsh packaging/windows/package.ps1 -Rid win-x64 `
 
 三个 RID（`win-x64`、`win-x86`、`win-arm64`）的 `windows/package.ps1` 链路（`publish.ps1` → 便携 zip → MSIX → NSIS 安装包）都在 Windows 上完整跑通过：`makeappx` 打出的包里 236 个条目、`Identity`、`Assets` 都对；安装包编出来以后，标题、左下角品牌字、中文组件页和目录页、卸载入口都实测看过，`signtool` 也验过。`win-x64` 和 `win-x86` 两个安装包是真的装出来的，`win-arm64` 走的是同一条链路和同一个 `x86-unicode` 目标，差别只在载荷。
 
-`linux/package.sh` 和 `macos/package.sh` 还没有在真实的 Linux/macOS 上执行过。CI 的 `lint` job 会在每次 push 时对它们做 `bash -n`、`shellcheck` 和打包契约检查，Windows 那个 `build` job 会顺手把 `win-x64` 的三个产物真打一遍；三个平台包的第一次真实打包发生在 `.github/workflows/release.yml` 里。
+CI 的 `build` job 已经在三个真机镜像上把整条链路跑绿：`windows-2025`、`ubuntu-24.04`、`macos-15` 上 restore → build → test（110 个）→ publish → smoke 全过，Windows 那一腿还把 `win-x64` 的 zip、MSIX、NSIS 安装包都真的打出来并签了名。`linux/package.sh` 和 `macos/package.sh` 本身还没有在 CI 里跑过，`lint` job 只对它们做 `bash -n`、`shellcheck` 和打包契约检查，这两个脚本的第一次真实执行发生在 `.github/workflows/release.yml` 里。

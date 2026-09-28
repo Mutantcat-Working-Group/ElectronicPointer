@@ -125,6 +125,6 @@ C# 命名空间用 `Mutantcat.ElectronicPointer` 而不是 `org.mutantcat.xxx`�
 
 Linux 平台层能在一台 Windows 机器上测，靠的就是 `IOverlayWindowTarget` 只暴露一个 `nint`：测试里塞进去的句柄可以是个假值，被测逻辑不会真的去连 X server。
 
-Windows 链路（publish → 便携 zip → MSIX → NSIS 安装包）在本机完整跑通过，三个 RID 都试过；Linux 和 macOS 的打包脚本由 CI 首次真实执行。这一点在 [../packaging/README.md](../packaging/README.md) 的「现状」一节里记着。
+Windows 链路（publish → 便携 zip → MSIX → NSIS 安装包）在本机完整跑通过，三个 RID 都试过；之后 CI 的 `build` job 在 `windows-2025` 真机镜像上把 `win-x64` 的三个产物连同签名重打了一遍，三个平台的 restore → build → test（110 个）→ publish → smoke 也全绿。Linux 和 macOS 的打包脚本目前只过了 `lint` 的静态检查，第一次真实执行发生在 `.github/workflows/release.yml` 里。这一点在 [../packaging/README.md](../packaging/README.md) 的「现状」一节里记着。
 
 Windows 那条链路末端多一样东西：一个 NSIS 安装包。它的存在理由是 MSIX 装不进某些机器（域策略、精简系统、离线环境），而 zip 又没有卸载入口。三个架构共用同一个 32 位 `x86-unicode` 安装程序，载荷的架构和安装程序的架构是两件事，理由和取舍记在 [../packaging/README.md](../packaging/README.md) 的「NSIS 安装包」一节。
