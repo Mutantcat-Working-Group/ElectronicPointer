@@ -136,4 +136,10 @@ pwsh packaging/windows/package.ps1 -Rid win-x64 `
 
 三个 RID（`win-x64`、`win-x86`、`win-arm64`）的 `windows/package.ps1` 链路（`publish.ps1` → 便携 zip → MSIX → NSIS 安装包）都在 Windows 上完整跑通过：`makeappx` 打出的包里 236 个条目、`Identity`、`Assets` 都对；安装包编出来以后，标题、左下角品牌字、中文组件页和目录页、卸载入口都实测看过，`signtool` 也验过。`win-x64` 和 `win-x86` 两个安装包是真的装出来的，`win-arm64` 走的是同一条链路和同一个 `x86-unicode` 目标，差别只在载荷。
 
-CI 的 `build` job 已经在三个真机镜像上把整条链路跑绿：`windows-2025`、`ubuntu-24.04`、`macos-15` 上 restore → build → test（110 个）→ publish → smoke 全过，Windows 那一腿还把 `win-x64` 的 zip、MSIX、NSIS 安装包都真的打出来并签了名。`linux/package.sh` 和 `macos/package.sh` 本身还没有在 CI 里跑过，`lint` job 只对它们做 `bash -n`、`shellcheck` 和打包契约检查，这两个脚本的第一次真实执行发生在 `.github/workflows/release.yml` 里。
+CI 的 `build` job 把六个 RID（`win-x64`、`win-x86`、`win-arm64`、`linux-x64`、`osx-x64`、`osx-arm64`）在三个真机镜像上全都跑到过：`windows-2025`、`ubuntu-24.04`、`macos-15` 上 restore → build → test（110 个）→ publish → 打包 → 校验。`lint` job 对全部脚本做 `bash -n`、`shellcheck` 和打包契约检查，那只是静态把关，下面写的产出是真实执行的结果。
+- Windows：三个架构的便携 zip、MSIX、NSIS 安装包都真的打出来并签了名（没有证书时是现场生成的 `CN=Mutantcat Working Group` 自签名证书），三个产物逐一断言存在。
+- Linux：`linux/package.sh` 在 runner 上真实执行，deb、AppImage、tar.gz 三个产物逐一断言存在；AppImage 还用 `--appimage-extract` 解开（runner 没有 FUSE，挂不起来），直接跑镜像里的 `AppRun --version`，「解压即用」是验过的，不是写在文档上的。
+- macOS：`macos/package.sh` 在 runner 上真实执行，两个架构的 `.app` 和 `.dmg` 都出了；CI 把 dmg 挂载起来，验过里面的 `Applications` 是指向 `/Applications` 的软链、验过 bundle 带 ad-hoc 签名，arm64 的那一份还从挂载的镜像里直接启动过。
+- `win-arm64` 和 `osx-x64` 在 runner 上没有对应硬件（x64 Windows 跑不了 ARM64 程序，arm64 的 macOS 镜像不带 Rosetta），这两个 payload 照常发布、打包、校验产物，只是不启动，`smoke` 步骤对它们自动跳过；`win-x86` 靠 WoW64 能启动，冒烟照旧。
+
+`release.yml` 只由 tag 触发，链路与 `ci.yml` 同源，还没有真实触发记录；正式发版由 `v1.0.<yyyymmdd>` 的 tag 触发，别擅自打。

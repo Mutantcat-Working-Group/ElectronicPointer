@@ -1,6 +1,8 @@
 # Runs on every push and pull request: builds the solution on all three desktop hosts,
-# runs the test suite, and publishes one runtime per host to confirm the cross-platform
-# payload actually launches there.
+# runs the test suite, publishes every shipping runtime and packages it into the artifacts
+# a user downloads, so the deb, the AppImage, the dmg and the NSIS installer are all proven
+# here rather than by hand. A payload whose architecture the host cannot run is still
+# published and packaged; only the smoke step skips it.
 name: CI
 
 on:
@@ -102,17 +104,30 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Each runner publishes the runtime it can actually launch, so the smoke step below
-          # exercises a real artifact instead of a cross-compiled one.
+          # Every runner publishes its own architecture and packages it there, because that
+          # is also the only place those runtime-specific packages can be built. The two
+          # payloads the host has no hardware for - win-arm64 on an x64 runner, osx-x64 on
+          # an arm64 runner without Rosetta - carry an empty executable: they are still
+          # published, packaged and confirmed, the smoke step is the only one that skips
+          # them. win-x86 does launch on x64 Windows through WoW64, so it keeps its smoke.
           - os: windows-latest
             rid: win-x64
             executable: ElectronicPointer.exe
+          - os: windows-latest
+            rid: win-x86
+            executable: ElectronicPointer.exe
+          - os: windows-latest
+            rid: win-arm64
+            executable: ''
           - os: ubuntu-latest
             rid: linux-x64
             executable: ElectronicPointer
           - os: macos-latest
             rid: osx-arm64
             executable: ElectronicPointer
+          - os: macos-latest
+            rid: osx-x64
+            executable: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -195,10 +210,106 @@ jobs:
             echo "built $name ($(du -h "artifacts/dist/$name" | cut -f1))"
           done
 
+      # package.sh is the Linux half of the chain, and it never ran anywhere before this
+      # job: the lint job only parses it. The deb, the AppImage and the portable tarball all
+      # come out of that one script and a broken step in it fails the build instead of a
+      # release. appimagetool is downloaded and then extracted rather than mounted, because
+      # the runner has no FUSE device, and the tool brings its own mksquashfs, so squashfs
+      # tools never have to be installed.
+      - name: package the linux payload
+        if: runner.os == 'Linux'
+        run: bash packaging/linux/package.sh ${{ matrix.rid }}
+
+      # All three names are derived from the same buildstamp the scripts read, so a missing
+      # artifact here means the script skipped a step, not a renamed one.
+      - name: confirm the linux artifacts
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          version=$(cat "artifacts/out/${{ matrix.rid }}/buildstamp.txt")
+          for name in \
+            "electronicpointer-$version-${{ matrix.rid }}.tar.gz" \
+            "electronicpointer_${version}_amd64.deb" \
+            "ElectronicPointer-$version-x86_64.AppImage"
+          do
+            if [ ! -f "artifacts/dist/$name" ]; then
+              echo "::error::missing artifacts/dist/$name"
+              ls -l artifacts/dist || true
+              exit 1
+            fi
+            echo "built $name ($(du -h "artifacts/dist/$name" | cut -f1))"
+          done
+
+      # The AppImage is the one artifact nothing can run straight from a runner, because a
+      # mount needs a FUSE device, so it is extracted the way appimagetool extracted itself
+      # and its own entry point is launched afterwards. That exercises the AppRun launcher,
+      # the relative link into the payload and the native libraries in one go, which is
+      # what the AppImage is actually worth.
+      - name: launch the packaged appimage
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          version=$(cat "artifacts/out/${{ matrix.rid }}/buildstamp.txt")
+          appimage="$GITHUB_WORKSPACE/artifacts/dist/ElectronicPointer-$version-x86_64.AppImage"
+          chmod +x "$appimage"
+          work="$RUNNER_TEMP/appimage-check"
+          rm -rf "$work"
+          mkdir -p "$work"
+          (
+            cd "$work" || exit 1
+            "$appimage" --appimage-extract >/dev/null
+            ./squashfs-root/AppRun --version
+          )
+
+      # package.sh is the macOS half: the .app bundle, the icns derived from the root
+      # icon.png, the ad-hoc seal the runner can give (no developer certificate exists
+      # there) and the dmg with the Applications drop link staged inside, sealed as well.
+      # Like the Linux script it never ran anywhere before this job.
+      - name: package the macos payload
+        if: runner.os == 'macOS'
+        run: bash packaging/macos/package.sh ${{ matrix.rid }}
+
+      # The dmg is what a user downloads, so it is mounted and read back here: the volume
+      # has to carry the Applications drop link, the bundle inside has to prove the ad-hoc
+      # signature the script claims, and on the architecture the runner can launch the
+      # bundled executable still answers --version.
+      - name: confirm the macos artifacts
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          version=$(cat "artifacts/out/${{ matrix.rid }}/buildstamp.txt")
+          dmg="artifacts/dist/ElectronicPointer-$version-${{ matrix.rid }}.dmg"
+          if [ ! -f "$dmg" ]; then
+            echo "::error::missing $dmg"
+            ls -l artifacts/dist || true
+            exit 1
+          fi
+          echo "built $dmg ($(du -h "$dmg" | cut -f1))"
+          plist="$RUNNER_TEMP/ep-attach.plist"
+          hdiutil attach -nobrowse -plist "$dmg" > "$plist"
+          mountpoint="$(/usr/libexec/PlistBuddy \
+            -c 'Print :system-entities:0:mount-point' "$plist")"
+          trap 'hdiutil detach "$mountpoint" >/dev/null 2>&1 || true' EXIT
+          echo "mounted $dmg at $mountpoint"
+          if [ ! -L "$mountpoint/Applications" ]; then
+            echo "::error::the volume has no Applications drop link"
+            exit 1
+          fi
+          echo "the drop link points at $(readlink "$mountpoint/Applications")"
+          codesign -dv --verbose=1 "$mountpoint/ElectronicPointer.app" 2>&1 |
+            grep -q 'Signature=adhoc'
+          echo "the bundle inside the image carries the ad-hoc signature"
+          if [ -n '${{ matrix.executable }}' ]; then
+            "$mountpoint/ElectronicPointer.app/Contents/MacOS/${{ matrix.executable }}" --version
+          fi
+          hdiutil detach "$mountpoint"
+          trap - EXIT
+
       # --version is answered before Avalonia starts, so this needs no display, no X11 and
       # no WindowServer, yet it still proves the native libraries resolved and the apphost
       # is executable.
       - name: smoke
+        if: matrix.executable != ''
         run: artifacts/out/${{ matrix.rid }}/${{ matrix.executable }} --version
 
       - name: record the payload summary
@@ -207,7 +318,11 @@ jobs:
           {
             echo '# ${{ matrix.rid }} published payload'
             echo
-            artifacts/out/${{ matrix.rid }}/${{ matrix.executable }} --version
+            if [ -n '${{ matrix.executable }}' ]; then
+              artifacts/out/${{ matrix.rid }}/${{ matrix.executable }} --version
+            else
+              echo '(published and packaged without launching: the host has no hardware for this runtime)'
+            fi
             echo
             echo "$(find artifacts/out/${{ matrix.rid }} -type f | wc -l) files, $(du -sh artifacts/out/${{ matrix.rid }} | cut -f1)"
           } > smoke.txt

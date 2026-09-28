@@ -5,4 +5,7 @@
 set -e
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-exec "$HERE/usr/bin/ElectronicPointer" "$@"
+# The launcher is the lowercase symlink package.sh drops into usr/bin, the same name the
+# .desktop entry execs, the deb installs into /usr/bin and postinst prints back to the
+# user. A Linux filesystem distinguishes case, so this has to match the link exactly.
+exec "$HERE/usr/bin/electronicpointer" "$@"
