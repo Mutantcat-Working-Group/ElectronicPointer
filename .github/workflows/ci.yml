@@ -88,7 +88,7 @@ jobs:
           fi
           # The installer has one target for all three payloads, and stock NSIS only ships a
           # stub for that target. A move to amd64-unicode or arm64-unicode would break the
-          # hosted runner, which installs stock NSIS.
+          # windows job below, which installs the stock NSIS package and no other stub source.
           grep -rn -- '^Target ' packaging/windows/installer.nsi
           grep -q 'Target x86-unicode' packaging/windows/installer.nsi || {
             echo "::error::installer.nsi must keep the x86-unicode target, see the comment there"
@@ -137,6 +137,24 @@ jobs:
       - name: publish the ${{ matrix.rid }} payload
         run: |
           pwsh packaging/publish.ps1 -Rid ${{ matrix.rid }}
+
+      # The hosted Windows image ships no NSIS at all, and makensis is the whole installer,
+      # so the stock package goes in before packaging. It lands in $env:ProgramFiles\NSIS,
+      # which Find-Nsis in package.ps1 already looks at, and its x86-unicode stub is the one
+      # target installer.nsi uses. The folder joins PATH as well, so any later step could
+      # call makensis directly too.
+      - name: install nsis
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress --no-color
+          $nsis = Join-Path $env:ProgramFiles 'NSIS'
+          if (-not (Test-Path -LiteralPath $nsis)) {
+            throw "choco left no NSIS in $nsis"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsis
+          Get-ChildItem -LiteralPath (Join-Path $nsis 'Stubs') -Filter '*x86-unicode*' -File |
+            ForEach-Object { Write-Host "stub $($_.Name)" }
 
       # package.ps1 is the half of the chain that only a Windows host can run, so the Windows
       # leg exercises it here over the payload it just published: the portable zip, the MSIX

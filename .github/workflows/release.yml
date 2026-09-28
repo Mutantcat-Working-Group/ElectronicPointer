@@ -151,6 +151,23 @@ jobs:
             -Rid ${{ matrix.rid }} `
             -DateStamp ${{ needs.version.outputs.stamp }}
 
+      # The hosted Windows image ships no NSIS at all, and makensis is the whole installer,
+      # so the stock package goes in before packaging. It lands in $env:ProgramFiles\NSIS,
+      # which Find-Nsis in package.ps1 already looks at, and its x86-unicode stub is the one
+      # target installer.nsi uses. The folder joins PATH as well, so a later step could call
+      # makensis directly too.
+      - name: install nsis
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress --no-color
+          $nsis = Join-Path $env:ProgramFiles 'NSIS'
+          if (-not (Test-Path -LiteralPath $nsis)) {
+            throw "choco left no NSIS in $nsis"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $nsis
+          Get-ChildItem -LiteralPath (Join-Path $nsis 'Stubs') -Filter '*x86-unicode*' -File |
+            ForEach-Object { Write-Host "stub $($_.Name)" }
+
       # The publisher of the MSIX identity is taken from the certificate when there is one,
       # because makeappx records the subject signtool later proves and the two have to agree.
       # With no secret the script mints a self-signed certificate instead and signs with that,

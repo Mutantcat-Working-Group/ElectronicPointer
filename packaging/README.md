@@ -104,11 +104,11 @@ pwsh packaging/windows/package.ps1 -Rid win-x64 `
 
 ### NSIS 安装包
 
-`installer.nsi` 用 `makensis` 编，输入还是同一棵发布树，所以它不需要 Visual Studio、不需要打包工程，hosted runner 上自带的 NSIS 就够。装法是每机一份：`$PROGRAMFILES` 下一个 `ElectronicPointer` 目录，开始菜单一个文件夹，桌面快捷方式和开机自启做成可选组件，卸载入口跟着开始菜单一起建。界面是中文的，升级时靠卸载注册表键认旧装，不会重复问一遍装到哪。
+`installer.nsi` 用 `makensis` 编，输入还是同一棵发布树，所以它不需要 Visual Studio、不需要打包工程，机器上装一份官方原版 NSIS 就够；托管镜像自己不带，两个 workflow 都是先 `choco install nsis` 再进打包步骤。装法是每机一份：`$PROGRAMFILES` 下一个 `ElectronicPointer` 目录，开始菜单一个文件夹，桌面快捷方式和开机自启做成可选组件，卸载入口跟着开始菜单一起建。界面是中文的，升级时靠卸载注册表键认旧装，不会重复问一遍装到哪。
 
 左下角的品牌字是 `电子教鞭 ElectronicPointer <版本号>`，不是 NSIS 默认的那串，做法就是把 `BrandingText` 写掉。
 
-**三个架构共用同一个 `x86-unicode` 目标。** 32 位的安装程序里装 64 位或 ARM64 的载荷没有任何问题：安装目录走 `$PROGRAMFILES64`，注册表走 `SetRegView 64`，卸载键因此不会落在 `Wow6432Node` 里跟 32 位那份打架。之所以不直接出 amd64/arm64 的安装程序，是因为 NSIS 官方只发 x86 系的 stub，hosted runner 装的是官方原版包，要编别的目标得先从源码编 stub。Git for Windows、Notepad++ 都是这么做的。`package.ps1` 里留了一个 `Test-NsisTarget` 守卫，万一某台机器的 NSIS 被裁过，会跳过安装包而不是让 makensis 报一句看不懂的错。
+**三个架构共用同一个 `x86-unicode` 目标。** 32 位的安装程序里装 64 位或 ARM64 的载荷没有任何问题：安装目录走 `$PROGRAMFILES64`，注册表走 `SetRegView 64`，卸载键因此不会落在 `Wow6432Node` 里跟 32 位那份打架。之所以不直接出 amd64/arm64 的安装程序，是因为 NSIS 官方只发 x86 系的 stub，CI 装的也是官方原版包，要编别的目标得先从源码编 stub。Git for Windows、Notepad++ 都是这么做的。`package.ps1` 里留了一个 `Test-NsisTarget` 守卫，万一某台机器的 NSIS 被裁过，会跳过安装包而不是让 makensis 报一句看不懂的错。
 
 签名顺序是先签装进包里的 `ElectronicPointer.exe`、再签 `setup.exe` 本身：NSIS 的载荷封在文件里，签名只能落在最后的附加数据上，所以顺序反了就白签。不带证书时脚本会现场生成一个 `CN=Mutantcat Working Group` 的自签名证书并用它签所有产物，用户第一次会被问一次「信不信这个发布者」；想要完全不要签名，加 `-SkipSigning`。
 

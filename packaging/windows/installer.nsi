@@ -48,9 +48,10 @@
 ; the architecture of the installer binary: the installer writes the 64 bit registry view
 ; through SetRegView 64 and installs into $PROGRAMFILES64, so the 64 bit and the ARM64
 ; payloads land in the same places they would land from a native installer. NSIS ships stubs
-; for the x86-unicode target only, and a hosted runner installs stock NSIS, so an amd64 or
-; arm64 stub would have to be built from source first. This is also what most of the NSIS
-; ecosystem ships: the familiar 32 bit installer binary, the native application inside it.
+; for the x86-unicode target only, and CI installs the stock package rather than building a
+; custom one, so an amd64 or an arm64 stub would have to be built from source first. This is
+; also what most of the NSIS ecosystem ships: the familiar 32 bit installer binary, with the
+; native application inside it.
 Target x86-unicode
 
 !include "MUI2.nsh"
