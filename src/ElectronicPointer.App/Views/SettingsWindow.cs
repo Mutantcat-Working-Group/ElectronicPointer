@@ -56,10 +56,14 @@ public sealed class SettingsWindow : Window
         var page = new StackPanel { Margin = new Thickness(18), Spacing = 16 };
         page.Children.Add(BuildGeneralSection());
         page.Children.Add(BuildFileSection());
+        page.Children.Add(BuildAboutSection());
         page.Children.Add(BuildPlatformSection());
         page.Children.Add(BuildCapabilitySection());
 
-        Content = new Border
+        // The card is a local, not the window's Content: the scrolling root below wraps it,
+        // and a control already parented to the window cannot be re-parented into the
+        // ScrollViewer without Avalonia refusing the move outright.
+        var card = new Border
         {
             Background = new SolidColorBrush(Color.Parse("#FFFFFF")),
             BorderBrush = new SolidColorBrush(Color.Parse("#D7DCE3")),
@@ -88,7 +92,7 @@ public sealed class SettingsWindow : Window
             Content = new Border
             {
                 Margin = new Thickness(4),
-                Child = (Control)Content,
+                Child = card,
             },
         });
         Content = root;
@@ -197,6 +201,60 @@ public sealed class SettingsWindow : Window
     {
         await _shell.SaveImageAsync();
         _status.Text = "图片已导出。";
+    }
+
+    /// <summary>
+    /// The product card: what this is, which build it is, and who publishes it. The
+    /// publisher line is the one place that question is answered inside the app, so a user
+    /// who got the installer from a mirror still learns where the software comes from,
+    /// with the site one click away rather than spelled out in a forum post.
+    /// </summary>
+    private Control BuildAboutSection()
+    {
+        var panel = new StackPanel { Spacing = 8 };
+        panel.Children.Add(Heading("关于"));
+
+        panel.Children.Add(Row("名称", new SelectableTextBlock
+        {
+            Text = $"{AppIdentity.GetDisplayName()} {AppIdentity.ProductName}",
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+        }));
+        panel.Children.Add(Row("版本", new SelectableTextBlock
+        {
+            Text = AppIdentity.Version,
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+        }));
+
+        var publisher = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        publisher.Children.Add(new TextBlock
+        {
+            Text = AppIdentity.PublisherName,
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        publisher.Children.Add(PublisherLink());
+        panel.Children.Add(Row("发行者", publisher));
+
+        return panel;
+    }
+
+    /// <summary>The publisher site as a link; Avalonia hands the URI to the platform launcher.</summary>
+    private static HyperlinkButton PublisherLink()
+    {
+        var link = new HyperlinkButton
+        {
+            Content = AppIdentity.PublisherDomain,
+            NavigateUri = new Uri(AppIdentity.PublisherWebsite),
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            BorderThickness = new Thickness(0),
+            FontSize = 12,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(link, $"打开 {AppIdentity.PublisherWebsite}");
+        return link;
     }
 
     private Control BuildPlatformSection()

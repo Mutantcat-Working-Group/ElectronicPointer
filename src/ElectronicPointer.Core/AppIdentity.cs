@@ -22,6 +22,16 @@ public static class AppIdentity
 
     public const string Organization = "mutantcat";
 
+
+    /// <summary>Publisher name the about box shows, in the language the interface speaks.</summary>
+    public const string PublisherName = "异猫工作群";
+
+    /// <summary>Bare publisher domain, the part of the site shown next to the publisher name.</summary>
+    public const string PublisherDomain = "mutantcat.org";
+
+    /// <summary>Publisher site the about box links to.</summary>
+    public const string PublisherWebsite = "https://mutantcat.org";
+
     /// <summary>macOS bundle identifier and Linux Flatpak application ID.</summary>
     public const string ApplicationId = "org.mutantcat.electronicpointer";
 
