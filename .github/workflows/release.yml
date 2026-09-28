@@ -152,19 +152,29 @@ jobs:
             -DateStamp ${{ needs.version.outputs.stamp }}
 
       # The hosted Windows image ships no NSIS at all, and makensis is the whole installer,
-      # so the stock package goes in before packaging. It lands in $env:ProgramFiles\NSIS,
-      # which Find-Nsis in package.ps1 already looks at, and its x86-unicode stub is the one
-      # target installer.nsi uses. The folder joins PATH as well, so a later step could call
-      # makensis directly too.
+      # so the stock package goes in before packaging. nsis is a meta package: nsis.install
+      # does the work and lands in Program Files or Program Files (x86) depending on the
+      # installer version, so whichever of the two actually has makensis.exe in it is the
+      # folder taken, which is exactly what Find-Nsis in package.ps1 looks at. The folder
+      # joins PATH as well, so any later step could call makensis directly too.
       - name: install nsis
         shell: pwsh
         run: |
           choco install nsis -y --no-progress --no-color
-          $nsis = Join-Path $env:ProgramFiles 'NSIS'
-          if (-not (Test-Path -LiteralPath $nsis)) {
-            throw "choco left no NSIS in $nsis"
+          $nsis = $null
+          foreach ($candidate in @(
+              (Join-Path $env:ProgramFiles 'NSIS'),
+              (Join-Path ${env:ProgramFiles(x86)} 'NSIS'))) {
+            if (Test-Path -LiteralPath (Join-Path $candidate 'makensis.exe')) {
+              $nsis = $candidate
+              break
+            }
+          }
+          if (-not $nsis) {
+            throw 'choco installed NSIS but no makensis.exe turned up in the well known folders'
           }
           Add-Content -Path $env:GITHUB_PATH -Value $nsis
+          Write-Host "makensis at $nsis"
           Get-ChildItem -LiteralPath (Join-Path $nsis 'Stubs') -Filter '*x86-unicode*' -File |
             ForEach-Object { Write-Host "stub $($_.Name)" }
 
