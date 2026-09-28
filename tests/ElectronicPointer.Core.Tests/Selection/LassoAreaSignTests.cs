@@ -43,7 +43,11 @@ public class LassoAreaSignTests
     [Fact]
     public void Area_ReversingTheLoop_FlipsTheSignOnly()
     {
-        var reversed = CounterClockwiseSquare.Reverse().ToArray();
+        // Reversed by hand rather than with LINQ: on an array, Reverse() resolves to a
+        // different overload depending on which SDK built the project, and the .NET 10 SDK
+        // picks one that returns void, so the chained call does not even compile there.
+        var reversed = (Vec2[])CounterClockwiseSquare.Clone();
+        Array.Reverse(reversed);
 
         Assert.Equal(-Lasso.Area(CounterClockwiseSquare), Lasso.Area(reversed), 6);
     }
