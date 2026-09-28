@@ -128,6 +128,8 @@ pwsh packaging/windows/package.ps1 -Rid win-x64 `
 
 唯一的图标源是仓库根目录的 `icon.png`。`packaging/tools/generate-icons.ps1` 从它派生所有提交进仓库的图标：Linux hicolor 七个尺寸、MSIX 的瓦片图、NSIS 用的多分辨率 `.ico`。换了图之后跑一次这个脚本，三个平台的包就都换好了。
 
+窗口标题栏那一处不用单独喂图：`ElectronicPointer.App.csproj` 的 `<ApplicationIcon>` 指向的就是那个 `.ico`，Avalonia 11.3 的构建任务（`AvaloniaIncludeApplicationIconAsWindowIcon`，默认开）会把它自动链成 `avares://ElectronicPointer/!__AvaloniaDefaultWindowIcon`，`Window` 在自身 `Icon` 为空时回退到它，所以设置窗口、托盘、任务栏到处都是同一个标，界面代码里不用写一行图标逻辑。
+
 ## 版本号
 
 版本号是 `1.0.<yyyymmdd>`，即「小版本 + 构建日期」。`AssemblyVersion` 固定为 `1.0.0.0`，因为日期戳每天都在变，而 CLR 只允许四段数字，把日期塞进程序集版本会让每次构建的强名称都不同；`InformationalVersion` 带日期戳，`--version` 读的是后者。
