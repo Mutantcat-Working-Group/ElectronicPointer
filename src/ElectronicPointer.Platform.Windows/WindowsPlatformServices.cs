@@ -19,14 +19,15 @@ namespace Mutantcat.ElectronicPointer.Platform.Windows;
 /// - screen freeze reads pixels through GDI;
 /// - a slideshow is spotted by its window class;
 /// - auto start is the HKCU Run value;
-/// - ink recognition stays off, because the Windows Ink text analyser the old build used
-///   is not portable and the replacement is an OCR plugin.
+/// - ink recognition runs the built in shape engine, the same one the other desktops use,
+///   because it was written to be portable from the start rather than depending on the
+///   Windows Ink analyser the old build was tied to.
 /// </summary>
 public sealed class WindowsPlatformServices : IPlatformServices
 {
     /// <summary>Why one button stays disabled, shown to the user in Chinese.</summary>
     public const string MissingCapabilitiesNote =
-        "手写识别暂未内置，将通过 org.mutantcat.electronicpointer.plugin.ocr 扩展提供。";
+        "内置墨迹引擎可把手写笔迹整理成规范图形（直线、箭头、矩形、三角形、椭圆），暂时不能把手写内容转写成文字。";
 
     private static readonly PlatformFeature[] SupportedFeatures =
     {
@@ -38,6 +39,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
         PlatformFeature.PerDisplayPlacement,
         PlatformFeature.PresentationDetection,
         PlatformFeature.AutoStart,
+        PlatformFeature.HandwritingRecognition,
     };
 
     private readonly Win32ScreenCaptureService _capture = new();
@@ -45,7 +47,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
     private readonly Win32OverlayChrome _overlay = new();
     private readonly Win32AutoStartService _autoStart = new();
     private readonly Win32PresentationBridge _presentation = new();
-    private readonly UnsupportedHandwritingRecognizer _recognizer = new();
+    private readonly BuiltInShapeRecognizer _recognizer = new();
 
     public WindowsPlatformServices()
     {
@@ -64,7 +66,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
 
     public IPresentationBridge Presentation => _presentation;
 
-    public IHandwritingRecognizer Recognizer => _recognizer;
+    public IInkRecognizer Recognizer => _recognizer;
 
     public IAutoStartService AutoStart => _autoStart;
 

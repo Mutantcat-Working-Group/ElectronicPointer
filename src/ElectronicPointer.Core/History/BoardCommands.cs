@@ -1,4 +1,5 @@
 using Mutantcat.ElectronicPointer.Core.Board;
+using Mutantcat.ElectronicPointer.Core.Geometry;
 using Mutantcat.ElectronicPointer.Core.Ink;
 
 namespace Mutantcat.ElectronicPointer.Core.History;
@@ -97,6 +98,41 @@ public sealed class StyleStrokeCommand : IBoardCommand
     }
 
     public void Revert(BoardDocument document) => _stroke.SetStyle(_oldStyle);
+}
+
+/// <summary>
+/// Redraws one stroke as the shape it was recognised as. The original samples are kept so
+/// the tidy up is a normal, reversible edit: a wrong reading costs one undo, not the ink.
+/// </summary>
+public sealed class ReplaceStrokeSamplesCommand : IBoardCommand
+{
+    private readonly Stroke _stroke;
+    private readonly List<Vec2> _samples;
+    private List<Vec2>? _original;
+
+    public ReplaceStrokeSamplesCommand(Stroke stroke, IReadOnlyList<Vec2> samples)
+    {
+        _stroke = stroke;
+        _samples = samples.ToList();
+    }
+
+    public string Label => "整理形状";
+
+    public void Apply(BoardDocument document)
+    {
+        _original = _stroke.Samples.Select(sample => sample.Point).ToList();
+        _stroke.ReplaceSamples(_samples);
+        document.Touch();
+    }
+
+    public void Revert(BoardDocument document)
+    {
+        if (_original is null)
+            return;
+
+        _stroke.ReplaceSamples(_original);
+        document.Touch();
+    }
 }
 
 public sealed class AddPageCommand : IBoardCommand

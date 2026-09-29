@@ -92,12 +92,14 @@ public sealed class UnsupportedPresentationBridge : IPresentationBridge
     }
 }
 
-public sealed class UnsupportedHandwritingRecognizer : IHandwritingRecognizer
+public sealed class UnsupportedInkRecognizer : IInkRecognizer
 {
     public bool IsSupported => false;
 
-    public Task<string> RecognizeAsync(IReadOnlyList<IReadOnlyList<Vec2>> strokes, CancellationToken cancellationToken)
-        => Task.FromResult(string.Empty);
+    public Task<RecognitionReport> RecognizeAsync(
+        IReadOnlyList<IReadOnlyList<Vec2>> strokes,
+        CancellationToken cancellationToken)
+        => Task.FromResult(RecognitionReport.Nothing);
 }
 
 public sealed class UnsupportedAutoStartService : IAutoStartService
@@ -132,7 +134,7 @@ public sealed class UnsupportedPlatformServices : IPlatformServices
 
     public IPresentationBridge Presentation { get; } = new UnsupportedPresentationBridge();
 
-    public IHandwritingRecognizer Recognizer { get; } = new UnsupportedHandwritingRecognizer();
+    public IInkRecognizer Recognizer { get; } = new UnsupportedInkRecognizer();
 
     public IAutoStartService AutoStart { get; } = new UnsupportedAutoStartService();
 

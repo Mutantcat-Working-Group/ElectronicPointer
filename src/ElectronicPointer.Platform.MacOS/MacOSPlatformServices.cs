@@ -14,14 +14,15 @@ namespace Mutantcat.ElectronicPointer.Platform.MacOS;
 /// The macOS bundle. Click-through, always-on-top and hiding from the Dock all come from
 /// AppKit window state; the global shortcut rides an event tap; screen freeze reads pixels
 /// from CoreGraphics; auto start writes a launch agent. Slideshow detection is the one piece
-/// that cannot match Windows, and hand-writing recognition has no portable OS API at all, so
-/// both are reported as unavailable rather than half-working.
+/// that cannot match Windows, so it is reported as unavailable rather than half-working;
+/// ink recognition runs the built in shape engine and needs nothing from the OS at all.
 /// </summary>
 public sealed class MacOSPlatformServices : IPlatformServices
 {
     /// <summary>What the user has to do before the disabled buttons come back.</summary>
     public const string MissingCapabilitiesNote =
-        "macOS 上手写识别与演示文稿联动暂未内置，分别由 org.mutantcat.electronicpointer.plugin.ocr 扩展与前端应用监视提供；"
+        "macOS 上暂不能联动放映中的演示文稿；"
+        + "内置墨迹引擎可把手写笔迹整理成规范图形，暂时不能把手写内容转写成文字；"
         + "首次使用屏幕冻结需要授权系统设置中的「屏幕录制」权限。";
 
     private static readonly PlatformFeature[] SupportedFeatures =
@@ -34,6 +35,7 @@ public sealed class MacOSPlatformServices : IPlatformServices
         PlatformFeature.PerDisplayPlacement,
         PlatformFeature.PresentationDetection,
         PlatformFeature.AutoStart,
+        PlatformFeature.HandwritingRecognition,
     };
 
     private readonly MacOSOverlayChrome _overlay = new();
@@ -41,7 +43,7 @@ public sealed class MacOSPlatformServices : IPlatformServices
     private readonly MacOSScreenCaptureService _capture = new();
     private readonly MacOSAutoStartService _autoStart = new();
     private readonly MacOSPresentationBridge _presentation = new();
-    private readonly UnsupportedHandwritingRecognizer _recognizer = new();
+    private readonly BuiltInShapeRecognizer _recognizer = new();
 
     public MacOSPlatformServices()
     {
@@ -60,7 +62,7 @@ public sealed class MacOSPlatformServices : IPlatformServices
 
     public IPresentationBridge Presentation => _presentation;
 
-    public IHandwritingRecognizer Recognizer => _recognizer;
+    public IInkRecognizer Recognizer => _recognizer;
 
     public IAutoStartService AutoStart => _autoStart;
 

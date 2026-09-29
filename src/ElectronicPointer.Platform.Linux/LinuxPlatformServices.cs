@@ -22,15 +22,15 @@ namespace Mutantcat.ElectronicPointer.Platform.Linux;
 /// working either way.
 ///
 /// Slideshow detection is a /proc scan, because there is no add-in model on Linux; the old
-/// Windows behaviour cannot be reached from outside the office suite. Handwriting recognition
-/// has no portable OS API at all and is left to the OCR extension.
+/// Windows behaviour cannot be reached from outside the office suite. Ink recognition asks
+/// nothing of the session at all, so it works on X11, Wayland and headless alike.
 /// </summary>
 public sealed class LinuxPlatformServices : IPlatformServices
 {
     /// <summary>What the user has to do before the disabled buttons come back.</summary>
     public const string MissingCapabilitiesNote =
         "Wayland 会话下全局快捷键、始终置顶与冻结屏幕不可用（协议不向客户端开放），请改用 X11 或 Xorg 会话；"
-        + "手写识别将由 org.mutantcat.electronicpointer.plugin.ocr 扩展提供，演示文稿联动依赖进程识别。";
+        + "内置墨迹引擎可把手写笔迹整理成规范图形，暂时不能把手写内容转写成文字；演示文稿联动依赖进程识别。";
 
     private static readonly PlatformFeature[] SupportedFeatures =
     {
@@ -42,6 +42,7 @@ public sealed class LinuxPlatformServices : IPlatformServices
         PlatformFeature.PerDisplayPlacement,
         PlatformFeature.PresentationDetection,
         PlatformFeature.AutoStart,
+        PlatformFeature.HandwritingRecognition,
     };
 
     private readonly X11OverlayChrome _overlay = new();
@@ -49,7 +50,7 @@ public sealed class LinuxPlatformServices : IPlatformServices
     private readonly X11ScreenCaptureService _capture = new();
     private readonly LinuxAutoStartService _autoStart = new();
     private readonly LinuxPresentationBridge _presentation = new();
-    private readonly UnsupportedHandwritingRecognizer _recognizer = new();
+    private readonly BuiltInShapeRecognizer _recognizer = new();
 
     private readonly PlatformCapabilities _capabilities;
 
@@ -75,7 +76,7 @@ public sealed class LinuxPlatformServices : IPlatformServices
 
     public IPresentationBridge Presentation => _presentation;
 
-    public IHandwritingRecognizer Recognizer => _recognizer;
+    public IInkRecognizer Recognizer => _recognizer;
 
     public IAutoStartService AutoStart => _autoStart;
 
@@ -104,6 +105,8 @@ public sealed class LinuxPlatformServices : IPlatformServices
                 PlatformFeature.PerDisplayPlacement,
                 PlatformFeature.PresentationDetection,
                 PlatformFeature.AutoStart,
+                // Ink recognition is pure arithmetic on points the session already delivered.
+                PlatformFeature.HandwritingRecognition,
             },
         };
 

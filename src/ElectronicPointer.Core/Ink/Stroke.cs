@@ -74,6 +74,20 @@ public sealed class Stroke
         _revision++;
     }
 
+    /// <summary>
+    /// Swaps the whole sample list for a tidier one. Used by shape recognition, which
+    /// redraws a wobbly stroke as the geometry it was meant to be, and by nothing else:
+    /// the ink on screen is the user's, so this only ever runs as an undoable command.
+    /// </summary>
+    public void ReplaceSamples(IReadOnlyList<Vec2> points)
+    {
+        Samples.Clear();
+        foreach (var point in points)
+            Samples.Add(StrokeSample.Create(point, null));
+
+        _revision++;
+    }
+
     /// <summary>Generates the filled polygon for the current samples and style.</summary>
     public IReadOnlyList<Vec2> BuildOutline()
     {

@@ -27,7 +27,7 @@ public interface IPlatformServices : IDisposable
 
     IPresentationBridge Presentation { get; }
 
-    IHandwritingRecognizer Recognizer { get; }
+    IInkRecognizer Recognizer { get; }
 
     IAutoStartService AutoStart { get; }
 

@@ -309,6 +309,12 @@ public sealed class BoardSession
     /// <summary>Abandons the gesture in flight, for instance when the tool is switched.</summary>
     public void CancelGesture()
     {
+        // An eraser sweep is only pushed onto the history when the pen is lifted. Abandoning
+        // the gesture instead - switching tool mid sweep, say - would otherwise drop the
+        // commands on the floor, and the ink they removed is gone with no undo to bring it
+        // back. Flushing first keeps a half finished sweep answerable to undo.
+        FlushEraseBatch();
+
         if (_active is not null)
         {
             ActivePage.ActiveStroke = null;
@@ -360,9 +366,12 @@ public sealed class BoardSession
     {
         lock (_sync)
         {
-            foreach (var stroke in _selected)
+            // Only strokes on the page in front of the user can be grabbed. A selection can
+            // outlive the page it was made on, and a holdover stroke would otherwise let
+            // the pointer drag ink the user cannot see.
+            foreach (var stroke in ActivePage.Strokes)
             {
-                if (StrokeHitTester.Intersects(stroke, boardPoint, 6))
+                if (_selected.Contains(stroke) && StrokeHitTester.Intersects(stroke, boardPoint, 6))
                     return stroke;
             }
         }
@@ -431,6 +440,9 @@ public sealed class BoardSession
 
     public void ClearPage()
     {
+        // Everything on the page is about to disappear, so the selection disappears with it.
+        ClearSelection();
+
         var page = ActivePage;
         if (!page.HasInk())
             return;
@@ -446,6 +458,8 @@ public sealed class BoardSession
 
     public void RemovePage()
     {
+        ClearSelection();
+
         RunOnDocument(document =>
         {
             if (document.Pages.Count <= 1)
@@ -455,11 +469,19 @@ public sealed class BoardSession
         });
     }
 
-    public void NextPage() => RunOnDocument(document => document.ActiveIndex++);
+    public void NextPage() => GoToPage(Document.ActiveIndex + 1);
 
-    public void PreviousPage() => RunOnDocument(document => document.ActiveIndex--);
+    public void PreviousPage() => GoToPage(Document.ActiveIndex - 1);
 
-    public void GoToPage(int index) => RunOnDocument(document => document.ActiveIndex = index);
+    /// <summary>
+    /// Shows another page. The selection does not travel with the user: ink on a page that
+    /// is no longer on screen must not still be selectable, draggable or erasable.
+    /// </summary>
+    public void GoToPage(int index)
+    {
+        ClearSelection();
+        RunOnDocument(document => document.ActiveIndex = index);
+    }
 
     /// <summary>Applies a frozen screen behind the ink, or removes it when passed null.</summary>
     public void Freeze(BoardBackground? background)
@@ -494,13 +516,44 @@ public sealed class BoardSession
         return true;
     }
 
-    public Task<string> RecognizeAsync(IHandwritingRecognizer recognizer, CancellationToken cancellationToken)
+    /// <summary>
+    /// Tidies the selected strokes into the shapes they were meant to be.
+    ///
+    /// The recognition itself runs off the UI thread, but the rewrite it produces is a
+    /// normal edit: it goes on the undo history as one step and leaves the original ink a
+    /// single undo away. A reading the user disagrees with therefore costs one press, and
+    /// strokes the engine could not read are left exactly as they were drawn.
+    /// </summary>
+    public async Task<RecognitionReport> RecognizeAsync(
+        IInkRecognizer recognizer,
+        CancellationToken cancellationToken)
     {
-        var strokes = SelectedStrokes()
+        var strokes = SelectedStrokes();
+        var paths = strokes
             .Select(stroke => (IReadOnlyList<Vec2>)stroke.Samples.Select(sample => sample.Point).ToArray())
             .ToArray();
 
-        return recognizer.RecognizeAsync(strokes, cancellationToken);
+        var report = await recognizer.RecognizeAsync(paths, cancellationToken).ConfigureAwait(false);
+        ApplyRecognition(strokes, report);
+        return report;
+    }
+
+    private void ApplyRecognition(IReadOnlyList<Stroke> strokes, RecognitionReport report)
+    {
+        var commands = new List<IBoardCommand>();
+
+        foreach (var ink in report.Ink)
+        {
+            if (ink.Index < 0 || ink.Index >= strokes.Count)
+                continue;
+
+            commands.Add(new ReplaceStrokeSamplesCommand(strokes[ink.Index], ink.Points));
+        }
+
+        if (commands.Count == 0)
+            return;
+
+        RunOnDocument(document => _history.Execute(document, new CompositeCommand("整理形状", commands)));
     }
 
     private void RunOnDocument(Action<BoardDocument> action)
