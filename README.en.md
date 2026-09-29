@@ -14,7 +14,7 @@ A cross-platform desktop pointer and annotation tool · [中文](./README.md)
 Core values:
 
 - Strictly layered, one-way dependencies: App (Avalonia shell) → Platform (Windows/macOS/Linux) → Platform.Abstractions → Rendering → Core. Platform quirks are absorbed by the platform layer, so behaviour is written once and works everywhere.
-- At startup the app probes what the host actually allows: click-through overlay, always-on-top, hiding from the task switcher, global hotkeys, screen capture, multiple displays, presentation detection, handwriting recognition and launch at login. Anything unavailable is greyed out with a Chinese explanation instead of failing later.
+- At startup the app probes what the host actually allows: click-through overlay, always-on-top, hiding from the task switcher, global hotkeys, screen capture, multiple displays, presentation detection, ink shape recognition and launch at login. Anything unavailable is greyed out with a Chinese explanation instead of failing later.
 - One board document (`.epboard`) opens on every platform.
 
 ### 2. Features
@@ -30,7 +30,7 @@ Core values:
 - Multi-page boards: previous page `Ctrl+PageUp`, next page `Ctrl+PageDown`, new page `Ctrl+N`, shown as `n / m` on the toolbar.
 - Undo `Ctrl+Z`, redo `Ctrl+Shift+Z`, clear the current page `Ctrl+Shift+Del`; button hints name the exact stroke the next undo would remove.
 - Freeze screen: capture the current screen as a background pinned behind the canvas and annotate over it.
-- Recognize ink: turn the selected strokes into text and put it on the clipboard, through a replaceable recognizer.
+- Recognize ink: the bundled shape engine tidies the selected strokes into proper lines, arrows, rectangles, triangles and ellipses. The tidy-up is an ordinary edit, so one `Ctrl+Z` puts the original ink back.
 - Lasso selection moves the selected strokes as a group.
 
 #### Desktop integration
@@ -93,11 +93,12 @@ Grab your platform from [Releases](https://github.com/Mutantcat-Working-Group/El
 - [X] Thirteen global shortcuts, with Ctrl folded to Cmd on macOS
 - [X] Multi-page boards, undo/redo, lasso select and move
 - [X] `.epboard` read/write and image export
-- [X] Freeze screen and the handwriting recognition entry point
+- [X] Freeze screen and the ink recognition entry point
+- [X] Bundled shape engine: recognition on ink, tidied shapes are undoable
+- [X] Canvases rebuilt per screen when displays are plugged, unplugged or rescaled, with the palette back at the bottom of the primary screen
 - [X] Platform capability probing with graceful degradation
 - [X] Launch at login toggle
 - [X] Packaging: NSIS/MSIX/zip on Windows, dmg on macOS, deb/AppImage/tar.gz on Linux
 - [X] GitHub Actions build and release pipeline
 - [ ] Verified runs on real macOS and Linux desktops (first executed by the release workflow)
-- [ ] A bundled handwriting recognizer (the interface is in place, engines are replaceable)
 - [ ] UI for rebinding shortcuts

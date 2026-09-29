@@ -39,7 +39,14 @@ public sealed class OverlayShell : IDisposable
     private readonly AppConfiguration _configuration = AppConfiguration.Load();
     private ToolbarWindow? _toolbar;
     private SettingsWindow? _settings;
+    private bool _shuttingDown;
     private bool _disposed;
+    private string _screenSignature = "unset";
+
+    // Windows the shell opened and has not seen close yet. The desktop lifetime closes
+    // everything on its way out, and the settings window can be closed by the user long
+    // before that, so a close left to do at exit has to be one that is still worth doing.
+    private readonly HashSet<Window> _openWindows = new();
 
     public OverlayShell()
     {
@@ -78,26 +85,109 @@ public sealed class OverlayShell : IDisposable
         // opened first and then asked where the screens are. Building the canvases from
         // that answer is what makes a three-monitor desk behave the same as a laptop.
         _toolbar = new ToolbarWindow(this);
+        Track(_toolbar);
         _toolbar.Show();
+        _toolbar.Screens.Changed += OnScreensChanged;
+
+        BuildOverlays();
+        RegisterHotkeys();
+        Platform.Presentation.Start();
+    }
+
+    /// <summary>
+    /// One canvas per display, built from what the host reports right now. The board itself
+    /// lives in the session, so new surfaces pick up exactly where the old ones left off:
+    /// only the windows are replaced, never the ink.
+    /// </summary>
+    private void BuildOverlays()
+    {
+        foreach (var overlay in _overlays.ToArray())
+            overlay.Close();
+
+        _overlays.Clear();
 
         foreach (var screen in AvailableScreens())
         {
             var overlay = new OverlayWindow(screen);
             _overlays.Add(overlay);
+            Track(overlay);
             overlay.Show();
             overlay.AttachChrome(Platform, Session);
             overlay.Bind(Session);
         }
 
-        MainWindow = _overlays.Count > 0 ? _overlays[0] : _toolbar;
-        RegisterHotkeys();
-        Platform.Presentation.Start();
+        MainWindow = _overlays.Count > 0 ? _overlays[0] : _toolbar!;
+
+        // The lifetime keeps its own reference to the main window, and it has to follow the
+        // new surface. A lifetime still holding a window that was closed is how an app
+        // ends up with no main window while its process stays alive.
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.MainWindow = MainWindow;
+
+        _screenSignature = ScreenSignature(AvailableScreens());
+    }
+
+    private void Track(Window window)
+    {
+        _openWindows.Add(window);
+        window.Closed += OnWindowClosed;
+    }
+
+    private void OnWindowClosed(object? sender, EventArgs e)
+    {
+        if (sender is not Window window)
+            return;
+
+        _openWindows.Remove(window);
+        window.Closed -= OnWindowClosed;
     }
 
     /// <summary>Every display, read through the toolbar's host window.</summary>
     private IReadOnlyList<Screen> AvailableScreens()
     {
         return _toolbar?.Screens?.All ?? Array.Empty<Screen>();
+    }
+
+    private void OnScreensChanged(object? sender, EventArgs e)
+    {
+        // Raised on the platform's own thread, and once per screen that changed: unplugging
+        // one monitor arrives as several events. The work is posted onto the UI thread and
+        // then checked against the current fingerprint, so a burst collapses into at most
+        // one rebuild per real change.
+        Dispatcher.UIThread.Post(RebuildIfDeskChanged);
+    }
+
+    private void RebuildIfDeskChanged()
+    {
+        if (_disposed || _shuttingDown)
+            return;
+
+        if (ScreenSignature(AvailableScreens()) == _screenSignature)
+            return;
+
+        BuildOverlays();
+
+        // The palette sits at the bottom of the primary screen, so a desk that changed
+        // underneath it has to be answered with a placement. Left alone it would float
+        // over a monitor that is no longer there.
+        _toolbar?.Reposition();
+    }
+
+    /// <summary>
+    /// A comparable fingerprint of the desk, so a screen reporting itself twice does not
+    /// cost a rebuild: the signature only moves when a display is added, removed, moved,
+    /// resized or has its scaling changed.
+    /// </summary>
+    private static string ScreenSignature(IReadOnlyList<Screen> screens)
+    {
+        if (screens.Count == 0)
+            return "empty";
+
+        var builder = new System.Text.StringBuilder();
+        foreach (var screen in screens)
+            builder.Append(screen.Bounds).Append('@').Append(screen.Scaling).Append(';');
+
+        return builder.ToString();
     }
 
     // ------------------------------------------------------------------ shortcuts
@@ -287,11 +377,15 @@ public sealed class OverlayShell : IDisposable
     private static bool SameSize(Screen screen, DisplayInfo display) =>
         screen.Bounds.Width == display.Width && screen.Bounds.Height == display.Height;
 
-    /// <summary>Saves the annotated page as a picture covering the whole desk.</summary>
-    public async Task SaveImageAsync()
+    /// <summary>
+    /// Exports the current page as a picture and says what happened, because the caller is
+    /// a button press with nothing else to show for it: a cancelled picker, a full disk and
+    /// a finished export all have to end up distinguishable on screen.
+    /// </summary>
+    public async Task<string> SaveImageAsync()
     {
         if (_toolbar is null)
-            return;
+            return "保存失败：工具条尚未就绪。";
 
         var file = await _toolbar.StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
         {
@@ -312,7 +406,7 @@ public sealed class OverlayShell : IDisposable
         });
 
         if (file is null)
-            return;
+            return "已取消保存。";
 
         var path = file.Path.LocalPath;
         var page = Session.Document.ActivePage;
@@ -338,8 +432,19 @@ public sealed class OverlayShell : IDisposable
         var jpeg = path.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase)
             || path.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase);
 
-        var bytes = jpeg ? BitmapExporter.EncodeJpeg(bitmap) : BitmapExporter.EncodePng(bitmap);
-        await File.WriteAllBytesAsync(path, bytes);
+        try
+        {
+            var bytes = jpeg ? BitmapExporter.EncodeJpeg(bitmap) : BitmapExporter.EncodePng(bitmap);
+            await File.WriteAllBytesAsync(path, bytes);
+            return $"已保存到 {path}";
+        }
+        catch (Exception exception)
+        {
+            // The picker already named a place to write, so a failure here is almost always
+            // the disk, the permission or the path. Reporting it beats a success message
+            // over a file that was never written.
+            return $"保存失败：{exception.Message}";
+        }
     }
 
     /// <summary>
@@ -375,6 +480,7 @@ public sealed class OverlayShell : IDisposable
         }
 
         _settings = new SettingsWindow(this);
+        Track(_settings);
         _settings.Show();
     }
 
@@ -394,6 +500,11 @@ public sealed class OverlayShell : IDisposable
     public void Quit()
     {
         SaveConfiguration();
+
+        // Once the user has asked to leave, the desk no longer has to be answered. The
+        // lifetime closes every window below, the screen list moves with them, and a
+        // rebuild that raced that would open windows nothing is going to close again.
+        _shuttingDown = true;
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.Shutdown();
@@ -462,8 +573,17 @@ public sealed class OverlayShell : IDisposable
         Session.Changed -= OnSessionChanged;
         Platform.Presentation.PresentationActiveChanged -= OnPresentationActiveChanged;
 
-        foreach (var overlay in _overlays.ToArray())
-            overlay.Close();
+        if (_toolbar is not null)
+            _toolbar.Screens.Changed -= OnScreensChanged;
+
+        // The desktop lifetime closes every window on its way out, and the palette is only
+        // hidden by its shortcut, so what is left for the shell to close at exit is exactly
+        // the windows the host has not closed itself. Anything already gone was taken off
+        // the list when it closed, which is what keeps a quit from double closing.
+        foreach (var window in _openWindows.ToArray())
+            window.Close();
+
+        _openWindows.Clear();
 
         _overlays.Clear();
 

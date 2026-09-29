@@ -199,8 +199,7 @@ public sealed class SettingsWindow : Window
 
     private async void OnSaveImage()
     {
-        await _shell.SaveImageAsync();
-        _status.Text = "图片已导出。";
+        _status.Text = await _shell.SaveImageAsync();
     }
 
     /// <summary>
@@ -311,7 +310,7 @@ public sealed class SettingsWindow : Window
             PlatformFeature.GlobalHotkey when linux => "X11 会话可用，Wayland 会话受界面协议限制",
             PlatformFeature.ScreenCapture when linux => "X11 会话可用，Wayland 会话受界面协议限制",
             PlatformFeature.PresentationDetection when !windows => "通过监视全屏放映进程实现，弱于 Office 插件",
-            PlatformFeature.HandwritingRecognition => "通过可替换的识别引擎提供",
+            PlatformFeature.HandwritingRecognition => "内置跨平台墨迹引擎，离线运行，整理结果可撤销",
             _ => null,
         };
     }

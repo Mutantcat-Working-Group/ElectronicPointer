@@ -21,7 +21,7 @@ public enum PlatformFeature
     /// <summary>Detect a running slideshow, used to ink on presentation slides.</summary>
     PresentationDetection,
 
-    /// <summary>Turn a stroke into text.</summary>
+    /// <summary>Tidy hand drawn strokes into proper shapes, offline and undoable.</summary>
     HandwritingRecognition,
 
     /// <summary>Launch the app when the user logs in.</summary>

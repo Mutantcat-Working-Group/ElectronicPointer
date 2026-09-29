@@ -13,14 +13,18 @@ namespace Mutantcat.ElectronicPointer.Platform.Linux.Tests.Services;
 public class LinuxPlatformServicesTests
 {
     [Fact]
-    public void Capabilities_NeverClaimHandwritingRecognition()
+    public void Capabilities_ClaimShapeRecognitionEverywhereButHeadless()
     {
         using var services = new LinuxPlatformServices();
 
-        // No Linux API recognises handwriting, so the button has to stay off until an OCR
-        // extension answers for it.
-        Assert.False(services.Capabilities.Supports(PlatformFeature.HandwritingRecognition));
-        Assert.False(services.Recognizer.IsSupported);
+        // Recognition is arithmetic over points the session already handed over, so no
+        // compositor has to agree to it. The engine is present on X11, on Wayland and
+        // headless alike; only the headless capability set stays empty, because a session
+        // with no screen has no board to tidy.
+        Assert.True(services.Recognizer.IsSupported);
+        Assert.Equal(
+            LinuxSession.Current != LinuxSessionKind.Headless,
+            services.Capabilities.Supports(PlatformFeature.HandwritingRecognition));
     }
 
     [Fact]
@@ -92,7 +96,7 @@ public class LinuxPlatformServicesTests
         Assert.True(services.Capabilities.Supports(PlatformFeature.PerDisplayPlacement));
         Assert.True(services.Capabilities.Supports(PlatformFeature.PresentationDetection));
         Assert.True(services.Capabilities.Supports(PlatformFeature.AutoStart));
-        Assert.False(services.Capabilities.Supports(PlatformFeature.HandwritingRecognition));
+        Assert.True(services.Capabilities.Supports(PlatformFeature.HandwritingRecognition));
     }
 
     [Fact]
@@ -107,13 +111,18 @@ public class LinuxPlatformServicesTests
     }
 
     [Fact]
-    public async Task Recognizer_WithNoEngine_GivesBackNothingRatherThanThrowing()
+    public async Task Recognizer_HandedBackNothing_AnswersRatherThanThrowing()
     {
         using var services = new LinuxPlatformServices();
 
-        var task = services.Recognizer.RecognizeAsync(Array.Empty<IReadOnlyList<Mutantcat.ElectronicPointer.Core.Geometry.Vec2>>(), CancellationToken.None);
+        var report = await services.Recognizer.RecognizeAsync(
+            Array.Empty<IReadOnlyList<Mutantcat.ElectronicPointer.Core.Geometry.Vec2>>(),
+            CancellationToken.None);
 
-        Assert.Equal(string.Empty, await task);
+        // An empty run is a normal answer, not an error: the toolbar reports the summary and
+        // nothing on the board moves.
+        Assert.Equal(0, report.Count);
+        Assert.False(string.IsNullOrWhiteSpace(report.Summary));
     }
 
     [Fact]

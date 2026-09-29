@@ -34,6 +34,12 @@ public partial class App : Application
             Shell = new OverlayShell();
             Shell.Start();
             desktop.MainWindow = Shell.MainWindow;
+
+            // Exiting the lifetime ends the process without closing anything the shell
+            // owns: the overlay windows, the global shortcuts and the platform watchers
+            // would all be torn down by the OS instead of being let go, which on Linux
+            // and macOS leaves hotkeys registered until the session restarts.
+            desktop.Exit += (_, _) => Shell?.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

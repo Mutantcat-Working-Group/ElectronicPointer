@@ -36,6 +36,8 @@ public sealed class ToolbarWindow : Window
     private readonly ToggleSwitch _passThrough = new();
     private Button _freezeButton = null!;
     private Button _recognizeButton = null!;
+    private readonly TextBlock _statusLabel = new();
+    private DispatcherTimer? _statusTimer;
     private bool _refreshing;
 
     public ToolbarWindow(OverlayShell shell)
@@ -44,6 +46,15 @@ public sealed class ToolbarWindow : Window
 
         _shell = shell;
         _colorButtons = new Button[InkPalette.Colors.Length];
+
+        // Fixed width and trimmed: the outcome of a save or a recognition is longer than
+        // the palette is prepared to grow for, and a palette that resizes under the user's
+        // pointer mid gesture is worse than one that clips a sentence.
+        _statusLabel.Width = 210;
+        _statusLabel.FontSize = 11;
+        _statusLabel.Foreground = new SolidColorBrush(Color.Parse("#8A9099"));
+        _statusLabel.TextTrimming = TextTrimming.CharacterEllipsis;
+        _statusLabel.VerticalAlignment = VerticalAlignment.Center;
 
         Title = AppIdentity.GetDisplayName();
         SystemDecorations = SystemDecorations.None;
@@ -125,6 +136,9 @@ public sealed class ToolbarWindow : Window
             Math.Min(Math.Max(x, area.X), Math.Max(area.X, area.Right - width)),
             Math.Min(Math.Max(y, area.Y), Math.Max(area.Y, area.Bottom - height)));
     }
+
+    /// <summary>Puts the palette back where it belongs, after the desk changed underneath it.</summary>
+    internal void Reposition() => Position = PreferredPosition();
 
     private void OnFramePressed(object? sender, PointerPressedEventArgs e)
     {
@@ -280,7 +294,7 @@ public sealed class ToolbarWindow : Window
         _freezeButton = FlatButton("冻结屏幕", "抓取当前屏幕作为批注底图", () => _shell.FreezeScreen());
         _freezeButton.IsEnabled = _shell.CanFreezeScreen;
 
-        _recognizeButton = FlatButton("识别墨迹", "把选中的笔迹转成文字", OnRecognize);
+        _recognizeButton = FlatButton("识别墨迹", "把选中的笔迹整理成规范的直线、箭头、矩形、三角形或椭圆", OnRecognize);
         _recognizeButton.IsEnabled = _shell.CanRecognize;
 
         panel.Children.Add(_passThrough);
@@ -294,10 +308,43 @@ public sealed class ToolbarWindow : Window
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
 
-        panel.Children.Add(FlatButton("保存图片", "把当前页导出为图片", () => _ = _shell.SaveImageAsync()));
+        panel.Children.Add(FlatButton("保存图片", "把当前页导出为图片", () => _ = OnSaveImageAsync()));
         panel.Children.Add(FlatButton("设置", null, () => { _shell.ShowSettings(); }));
         panel.Children.Add(FlatButton("退出", "Ctrl+Q", () => _shell.Quit()));
+        panel.Children.Add(Separator());
+        panel.Children.Add(_statusLabel);
         _groups.Children.Add(Segment("文件", panel));
+    }
+
+    /// <summary>The outcome of a press that has no other visible result to show.</summary>
+    private void ReportStatus(string message)
+    {
+        _statusLabel.Text = message;
+        // The label clips so it cannot push the palette wider, so the full sentence is
+        // still reachable on hover.
+        ToolTip.SetTip(_statusLabel, message);
+
+        if (_statusTimer is null)
+        {
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+            _statusTimer.Tick += (_, _) =>
+            {
+                _statusTimer.Stop();
+                _statusLabel.Text = string.Empty;
+            };
+        }
+
+        // Restarting is what makes the message readable: a second press inside the interval
+        // replaces the message and keeps it on screen for another full turn, rather than
+        // blinking it out halfway through being read.
+        _statusTimer.Stop();
+        _statusTimer.Start();
+    }
+
+    private async Task OnSaveImageAsync()
+    {
+        ReportStatus("正在导出…");
+        ReportStatus(await _shell.SaveImageAsync());
     }
 
     private static Border Segment(string label, Panel content)
@@ -359,13 +406,29 @@ public sealed class ToolbarWindow : Window
     private async void OnRecognize()
     {
         var recognizer = _shell.Platform.Recognizer;
+        if (!recognizer.IsSupported)
+        {
+            ReportStatus("当前平台没有可用的墨迹引擎。");
+            return;
+        }
+
         _recognizeButton.IsEnabled = false;
+        ReportStatus("正在识别…");
 
         try
         {
-            var text = await _shell.Session.RecognizeAsync(recognizer, default);
-            if (!string.IsNullOrWhiteSpace(text))
-                await Clipboard!.SetTextAsync(text);
+            var report = await _shell.Session.RecognizeAsync(recognizer, default);
+            ReportStatus(report.Summary);
+        }
+        catch (OperationCanceledException)
+        {
+            ReportStatus("已取消识别。");
+        }
+        catch (Exception exception)
+        {
+            // Recognition sits on top of the board, never under it: the ink, the undo
+            // history and the toolbar all have to survive an engine that misbehaves.
+            ReportStatus($"识别失败：{exception.Message}");
         }
         finally
         {

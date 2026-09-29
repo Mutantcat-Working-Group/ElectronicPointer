@@ -13,7 +13,7 @@
 | PPT 联动 | VSTO 加载项 + Office COM | 放映状态和批注接口是 COM 活字。Office for Mac 的 COM 是另一套，Linux 上根本没有 Office 可调 |
 | 手写识别 | `InkCanvasForClass.IACoreHelper` | IACore 是 .NET Framework 4.7.2 + x86 的原生库，二进制层面绑死了 Windows |
 
-这四样在新实现里分别换成：Avalonia、自己写的墨迹模型、平台进程监视、外部识别扩展。
+这四样在新实现里分别换成：Avalonia、自己写的墨迹模型、平台进程监视、内置的跨平台形状识别引擎。
 
 ## 新架构
 
@@ -29,7 +29,7 @@ ElectronicPointer.App                     Avalonia 外壳：窗口、工具栏�
 
 | 层 | 内容 | 引用 |
 | --- | --- | --- |
-| `Core` | `Vec2`、`Stroke`、`StrokeStyle`、`BoardPage`/`BoardDocument`、`UndoRedoStack`、`Lasso`、`BoardDocumentSerializer`、`DefaultHotkeys`、`AppIdentity` | 无。纯逻辑，连 Skia 都不引 |
+| `Core` | `Vec2`、`Stroke`、`StrokeStyle`、`BoardPage`/`BoardDocument`、`UndoRedoStack`、`Lasso`、`BoardDocumentSerializer`、`DefaultHotkeys`、`AppIdentity`、`ShapeRecognizer` | 无。纯逻辑，连 Skia 都不引 |
 | `Rendering` | `BoardRenderer`、`RenderOptions`、`BitmapExporter` | Core + SkiaSharp |
 | `Platform.Abstractions` | `IPlatformServices` 及其成员接口、`PlatformCapabilities` | Core |
 | `Platform.Windows` / `MacOS` / `Linux` | 各自一套 P/Invoke 实现 | Core + Abstractions |
@@ -51,7 +51,7 @@ App 侧的 `AvaloniaHandle` 在 `OverlayWindow.AttachChrome` 里从 `TopLevel.Tr
 
 ### 能力清单
 
-平台差异不靠 try/catch 掩盖。每个平台启动时给出一个 `PlatformCapabilities`，列出九项 `PlatformFeature`（穿透、置顶、隐藏于任务切换器、全局热键、截屏、演示文稿检测、手写识别、自启、跨显示器放置）里哪些真的可用，外加一句中文说明告诉用户缺的东西要怎么补。工具栏读到清单就把对应按钮置灰，而不是等用户点了没反应。
+平台差异不靠 try/catch 掩盖。每个平台启动时给出一个 `PlatformCapabilities`，列出九项 `PlatformFeature`（穿透、置顶、隐藏于任务切换器、全局热键、截屏、演示文稿检测、墨迹整理、自启、跨显示器放置）里哪些真的可用，外加一句中文说明告诉用户缺的东西要怎么补。工具栏读到清单就把对应按钮置灰，而不是等用户点了没反应。
 
 ## 「使用效果一致」具体指什么
 
@@ -59,7 +59,7 @@ App 侧的 `AvaloniaHandle` 在 `OverlayWindow.AttachChrome` 里从 `TopLevel.Tr
 
 ### 1. 完全一致：由 Core 决定的部分
 
-笔迹采样与实时绘制（按下即在画，抬起才成形）、圆形橡皮擦除、套索选择与拖拽、撤销/重做栈、多页面与页面切换、序列化格式、导出 PNG/JPEG。这些是纯逻辑加纯数学，三个平台执行同一段代码，没有平台分支，结果逐像素一致。
+笔迹采样与实时绘制（按下即在画，抬起才成形）、圆形橡皮擦除、套索选择与拖拽、撤销/重做栈、多页面与页面切换、序列化格式、导出 PNG/JPEG、墨迹整理（`ShapeRecognizer` 从采样点里认出直线、箭头、矩形、三角形、椭圆）。这些是纯逻辑加纯数学，三个平台执行同一段代码，没有平台分支，结果逐像素一致。
 
 ### 2. 协议一致：由 App 决定的部分
 
@@ -85,6 +85,14 @@ Windows 上是 `WS_EX_TRANSPARENT` 加分层窗口，macOS 上是 `ignoresMouseE
 
 Avalonia 11.3 删掉了 `ISkiaSharpApi`，`DrawingContext` 也不再暴露底层 Skia canvas，所以 `OverlayCanvas.Render` 只有一条路：渲染进 `SKBitmap(w, h, Bgra8888, Premul)`，`Marshal.Copy` 到 `WriteableBitmap.Lock()` 的地址，再 `context.DrawImage` 交给平台合成。这不是退而求其次的备选路径，而是唯一的绘制入口，好处是它恰好和导出共用代码，两端不可能对不上。
 
+### 显示器变化
+
+显示器随时可能被拔掉、插上、改分辨率或改缩放。屏幕列表来自工具栏窗口的 `Screens`，`Changed` 事件在平台自己的线程上到达，而且一块显示器的变化会分成好几次来。外壳把重建 Post 到 UI 线程，再用一份屏幕指纹（每块屏幕的边界加缩放拼接成的字符串）和当前桌面比对：指纹没动就当无事发生，动了才按新的屏幕清单重建全部画布。笔迹存在会话里而不是窗口里，所以换掉的只是窗口，墨迹原地不动；工具条随后重新落位到主屏底部。
+
+### 墨迹整理
+
+「识别墨迹」走内置引擎：`IInkRecognizer` 是接口，`BuiltInShapeRecognizer` 是自带实现，识别在 `Task.Run` 里跑，不占 UI 线程。识别结果不是直接把笔迹换掉，而是生成 `ReplaceStrokeSamplesCommand`，和其他编辑一样进撤销栈，一步 `Ctrl+Z` 还原；认不出来的笔迹原样留在板上。引擎不可用时按钮置灰，原因文字由平台层的能力清单给出，三个平台用同一段内置逻辑。
+
 ## 哪些地方注定不一致
 
 | 功能 | Windows | macOS | Linux |
@@ -93,7 +101,7 @@ Avalonia 11.3 删掉了 `ISkiaSharpApi`，`DrawingContext` 也不再暴露底层
 | 全局热键 | `RegisterHotKey` | 事件 tap，需辅助功能权限 | X11 `XGrabKey`，Wayland 多数合成器不转发，置灰 |
 | 冻结屏幕 | GDI 抓屏 | `CGWindowListCreateImage`，首次要「屏幕录制」授权 | X11 `XGetImage`，Wayland 不可用 |
 | 演示文稿联动 | COM 读放映状态，最准 | 前端应用进程监视 | `/proc` 扫进程名 |
-| 手写识别 | IACore 专有 | 无系统 API，交给 OCR 扩展 | 同左 |
+| 墨迹整理 | 内置引擎 | 内置引擎 | 内置引擎 |
 | 自启 | 注册表 Run 项 / AUMID | LaunchAgent plist | `~/.config/autostart` 桌面项 |
 
 三条值得多说：
@@ -117,14 +125,14 @@ C# 命名空间用 `Mutantcat.ElectronicPointer` 而不是 `org.mutantcat.xxx`�
 
 ## 测试
 
-110 个测试按风险分布，不追求覆盖率数字：
+120 个测试按风险分布，不追求覆盖率数字：
 
-- Core 58 个，撤销栈、套索面积符号、序列化往返、身份与版本号，全是跨平台一致的核心契约
+- Core 68 个，撤销栈、套索面积符号、序列化往返、身份与版本号、形状识别降噪与分类，全是跨平台一致的核心契约
 - Rendering 22 个，位图导出尺寸与编码往返
 - Linux 平台 30 个，键码映射、能力清单随会话收窄、进程监视的判定逻辑
 
 Linux 平台层能在一台 Windows 机器上测，靠的就是 `IOverlayWindowTarget` 只暴露一个 `nint`：测试里塞进去的句柄可以是个假值，被测逻辑不会真的去连 X server。
 
-Windows 链路（publish → 便携 zip → MSIX → NSIS 安装包）在本机完整跑通过，三个 RID 都试过；之后 CI 的 `build` job 在三个真机镜像上把六个 RID（`win-x64`、`win-x86`、`win-arm64`、`linux-x64`、`osx-x64`、`osx-arm64`）全部重打了一遍，restore → build → test（110 个）→ publish → 打包 → 产物校验全绿：Windows 三个架构的 zip、MSIX、NSIS 安装包带签名产出，Linux 的 deb / AppImage / tar.gz 和 macOS 两个架构的 dmg 也都真的打了出来并逐项校验过。`win-arm64` 和 `osx-x64` 在 runner 上没有能启动的硬件，是「打包但不启动」，冒烟对这两个自动跳过。这一点在 [../packaging/README.md](../packaging/README.md) 的「现状」一节里记着。
+Windows 链路（publish → 便携 zip → MSIX → NSIS 安装包）在本机完整跑通过，三个 RID 都试过；之后 CI 的 `build` job 在三个真机镜像上把六个 RID（`win-x64`、`win-x86`、`win-arm64`、`linux-x64`、`osx-x64`、`osx-arm64`）全部重打了一遍，restore → build → test（120 个）→ publish → 打包 → 产物校验全绿：Windows 三个架构的 zip、MSIX、NSIS 安装包带签名产出，Linux 的 deb / AppImage / tar.gz 和 macOS 两个架构的 dmg 也都真的打了出来并逐项校验过。`win-arm64` 和 `osx-x64` 在 runner 上没有能启动的硬件，是「打包但不启动」，冒烟对这两个自动跳过。这一点在 [../packaging/README.md](../packaging/README.md) 的「现状」一节里记着。
 
 Windows 那条链路末端多一样东西：一个 NSIS 安装包。它的存在理由是 MSIX 装不进某些机器（域策略、精简系统、离线环境），而 zip 又没有卸载入口。三个架构共用同一个 32 位 `x86-unicode` 安装程序，载荷的架构和安装程序的架构是两件事，理由和取舍记在 [../packaging/README.md](../packaging/README.md) 的「NSIS 安装包」一节。
