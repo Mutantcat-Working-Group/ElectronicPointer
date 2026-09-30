@@ -48,17 +48,17 @@ ElectronicPointer · 跨平台桌面电子教鞭与批注 · [English](./README.
 
 ### 三、安装与下载
 
-从 [Releases](https://github.com/Mutantcat-Working-Group/ElectronicPointer/releases) 下载对应平台的产物。版本号形如 `1.0.20261003`，即小版本加构建日期。
+从 [Releases](https://github.com/Mutantcat-Working-Group/ElectronicPointer/releases) 下载对应平台的产物。版本号形如 `1.0.20261004`，即小版本加构建日期。
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| Windows | `ElectronicPointer-1.0.20261003-win-x64-setup.exe` | NSIS 安装包，中文界面，x64/x86/arm64 三架构 |
-| Windows | `ElectronicPointer-1.0.20261003-win-x64.msix` | 安装版，带开始菜单项与卸载入口 |
-| Windows | `ElectronicPointer-1.0.20261003-win-x64.zip` | 便携版，解压即用 |
-| macOS | `ElectronicPointer-1.0.20261003-osx-arm64.dmg` | 磁盘映像，含 Applications 快捷方式，x64 与 arm64 各一份 |
-| Linux | `electronicpointer_1.0.20261003_amd64.deb` | Debian/Ubuntu 安装包，注册桌面入口与图标 |
-| Linux | `ElectronicPointer-1.0.20261003-x86_64.AppImage` | 单文件运行，不需要 root |
-| Linux | `electronicpointer-1.0.20261003-linux-x64.tar.gz` | 纯净目录树，可放进 U 盘或自建源 |
+| Windows | `ElectronicPointer-1.0.20261004-win-x64-setup.exe` | NSIS 安装包，中文界面，x64/x86/arm64 三架构 |
+| Windows | `ElectronicPointer-1.0.20261004-win-x64.msix` | 安装版，带开始菜单项与卸载入口 |
+| Windows | `ElectronicPointer-1.0.20261004-win-x64.zip` | 便携版，解压即用 |
+| macOS | `ElectronicPointer-1.0.20261004-osx-arm64.dmg` | 磁盘映像，含 Applications 快捷方式，x64 与 arm64 各一份 |
+| Linux | `electronicpointer_1.0.20261004_amd64.deb` | Debian/Ubuntu 安装包，注册桌面入口与图标 |
+| Linux | `ElectronicPointer-1.0.20261004-x86_64.AppImage` | 单文件运行，不需要 root |
+| Linux | `electronicpointer-1.0.20261004-linux-x64.tar.gz` | 纯净目录树，可放进 U 盘或自建源 |
 
 1. macOS 首次启动若被 Gatekeeper 拦下，执行一次 `xattr -cr /Applications/ElectronicPointer.app`。
 2. Windows 安装包使用自签名证书，SmartScreen 会询问一次是否信任该发布者。
