@@ -44,7 +44,13 @@ public sealed class BoardSession
     private bool _eraserCursorVisible;
     private long _cleanRevision;
 
-    /// <summary>Raised after anything a window or a toolbar would want to redraw.</summary>
+    /// <summary>
+    /// Raised after anything a window or a toolbar would want to redraw. The thread it is
+    /// raised on is wherever the change happened: pointer work is the UI thread, a
+    /// recognition rewrite is wherever its engine finished. Subscribers that touch a window
+    /// have to marshal to the dispatcher themselves, which is what keeps this class usable
+    /// from a hotkey thread without dragging a dispatcher into it.
+    /// </summary>
     public event Action? Changed;
 
     public BoardSession()
@@ -193,16 +199,10 @@ public sealed class BoardSession
     public bool EraserCursorVisible => _eraserCursorVisible;
 
     /// <summary>
-    /// Tracks the eraser ring so it follows the pointer between strokes as well as during
-    /// one, which is what makes it possible to aim before committing.
+    /// Hides the eraser ring once the pointer has left a surface. The ring follows the
+    /// pointer while it is on one, which <see cref="PointerMoved"/> tracks; this is the
+    /// other half of that, so a ring is never left floating over the desk.
     /// </summary>
-    public void Hover(Vec2 boardPoint)
-    {
-        _eraserCursor = boardPoint;
-        _eraserCursorVisible = _tool == ToolKind.Eraser && !_passThrough;
-        RaiseChanged();
-    }
-
     public void Leave()
     {
         if (!_eraserCursorVisible)

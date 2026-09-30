@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.Threading;
 using SkiaSharp;
 using Mutantcat.ElectronicPointer.App.Session;
 using Mutantcat.ElectronicPointer.Core.Board;
@@ -230,6 +231,18 @@ public sealed class OverlayCanvas : Control
 
     private void OnSessionChanged()
     {
+        // The session raises this from wherever the change happened. Pointer work arrives
+        // on the UI thread, but recognition finishes on a thread-pool thread, and touching
+        // a visual from there is not allowed: painting would race the render thread and
+        // the cursor assignment would answer to whichever thread got there last. The check
+        // first part is what keeps a stroke being drawn at pointer speed, where a round
+        // trip through the dispatcher would show up as lag under the pen.
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(OnSessionChanged);
+            return;
+        }
+
         RefreshChrome();
         InvalidateVisual();
     }
