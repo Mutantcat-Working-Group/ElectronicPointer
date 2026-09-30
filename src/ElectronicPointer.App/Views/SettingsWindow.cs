@@ -54,7 +54,13 @@ public sealed class SettingsWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         CanResize = false;
         RequestedThemeVariant = ThemeVariant.Light;
-        Background = new SolidColorBrush(Color.Parse("#F4F6F9"));
+        // The dialog's shape is the sheet below and nothing else, and for the same reason as
+        // the palette's card: a window that paints its own opaque background lays a square
+        // sheet under a rounded one, and whatever the window manager then does to a frameless
+        // window lands on top of what was drawn, so no two corners agree. The sheet carries
+        // all four corners itself instead, which every platform then shows the same way.
+        Background = Brushes.Transparent;
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
 
         // The desk is covered in topmost ink while this is open, so an ordinary window would
         // be painted underneath all of it: the dialog opens, and nothing arrives. Joining the
@@ -104,10 +110,24 @@ public sealed class SettingsWindow : Window
                 Child = card,
             },
         });
-        Content = root;
+        // The sheet is the window's own shape now, so it is the thing that carries the
+        // rounding: the card inside is already rounded, but it sits four pixels in, which
+        // leaves the window's corners to whatever the host decides to do with them.
+        Content = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#F4F6F9")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#D7DCE3")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Child = root,
+        };
 
         Opened += OnOpened;
         Closed += OnClosed;
+        // The dialog gets its chrome settled before the window manager composes it, for the
+        // reason the palette does; otherwise the host's idea of the corner shape arrives a
+        // frame late and only some of it sticks.
+        this.ApplyChromeBeforeFirstShow(LiftAboveOverlays);
     }
 
     private readonly StackPanel _footerHost;

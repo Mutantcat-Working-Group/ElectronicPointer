@@ -115,6 +115,12 @@ public sealed class ToolbarWindow : Window
         BuildSystemGroup();
 
         Opened += OnOpened;
+        // Windows 11 decides the shape of a frameless window the first time it composes one
+        // and leaves a corner it has already decided alone afterwards, so refusing its
+        // rounding has to happen while the native handle exists and the window is still
+        // hidden: OnOpened arrives once that shape is already settled. Everything asked for
+        // here is applied again in OnOpened, which is where the z-order lives.
+        this.ApplyChromeBeforeFirstShow(LiftAboveOverlays);
         Refresh();
     }
 
