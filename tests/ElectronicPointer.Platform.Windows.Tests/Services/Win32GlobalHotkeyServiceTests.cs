@@ -63,6 +63,22 @@ public sealed class Win32GlobalHotkeyServiceTests : IDisposable
         Assert.False(_service.Value.Unregister(Gesture));
     }
 
+    [Fact]
+    public void ALateCallerIsToldTheSinkIsGone()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        // Shut the sink down first: whatever arrives afterwards must be answered with
+        // "there is no window" immediately instead of waiting out the round trip
+        // timeout on a queue whose message loop has already left.
+        var service = new Win32GlobalHotkeyService();
+        service.Dispose();
+
+        Assert.False(service.IsSupported);
+        Assert.False(service.Register(Gesture));
+    }
+
     public void Dispose()
     {
         if (_service.IsValueCreated)

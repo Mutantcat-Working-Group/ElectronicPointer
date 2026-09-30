@@ -70,7 +70,21 @@ internal sealed class HotkeySink : IDisposable
     {
         get
         {
-            _ready.Wait(TimeSpan.FromSeconds(2));
+            // A caller arriving after the sink is gone has to be told the window is
+            // gone, not be handed the event dispose already returned, and not be
+            // answered by a queue whose loop has since left.
+            if (_disposed)
+                return IntPtr.Zero;
+
+            try
+            {
+                _ready.Wait(TimeSpan.FromSeconds(2));
+            }
+            catch (ObjectDisposedException)
+            {
+                return IntPtr.Zero;
+            }
+
             return _hwnd;
         }
     }
