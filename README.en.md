@@ -48,17 +48,17 @@ Core values:
 
 ### 3. Install and Download
 
-Grab your platform from [Releases](https://github.com/Mutantcat-Working-Group/ElectronicPointer/releases). Versions look like `1.0.20261004`, that is the minor version plus the build date.
+Grab your platform from [Releases](https://github.com/Mutantcat-Working-Group/ElectronicPointer/releases). Versions look like `1.0.20261005`, that is the minor version plus the build date.
 
 | Platform | Artifact | Notes |
 | --- | --- | --- |
-| Windows | `ElectronicPointer-1.0.20261004-win-x64-setup.exe` | NSIS installer, Chinese UI, x64/x86/arm64 |
-| Windows | `ElectronicPointer-1.0.20261004-win-x64.msix` | Installed build with Start menu entry and uninstaller |
-| Windows | `ElectronicPointer-1.0.20261004-win-x64.zip` | Portable, unzip and run |
-| macOS | `ElectronicPointer-1.0.20261004-osx-arm64.dmg` | Disk image with an Applications symlink, x64 and arm64 |
-| Linux | `electronicpointer_1.0.20261004_amd64.deb` | Debian/Ubuntu package with desktop entry and icons |
-| Linux | `ElectronicPointer-1.0.20261004-x86_64.AppImage` | Single file, no root needed |
-| Linux | `electronicpointer-1.0.20261004-linux-x64.tar.gz` | Plain directory tree |
+| Windows | `ElectronicPointer-1.0.20261005-win-x64-setup.exe` | NSIS installer, Chinese UI, x64/x86/arm64 |
+| Windows | `ElectronicPointer-1.0.20261005-win-x64.msix` | Installed build with Start menu entry and uninstaller |
+| Windows | `ElectronicPointer-1.0.20261005-win-x64.zip` | Portable, unzip and run |
+| macOS | `ElectronicPointer-1.0.20261005-osx-arm64.dmg` | Disk image with an Applications symlink, x64 and arm64 |
+| Linux | `electronicpointer_1.0.20261005_amd64.deb` | Debian/Ubuntu package with desktop entry and icons |
+| Linux | `ElectronicPointer-1.0.20261005-x86_64.AppImage` | Single file, no root needed |
+| Linux | `electronicpointer-1.0.20261005-linux-x64.tar.gz` | Plain directory tree |
 
 1. If Gatekeeper stops the first launch on macOS, run `xattr -cr /Applications/ElectronicPointer.app` once.
 2. The Windows installers are self-signed, so SmartScreen asks once whether you trust the publisher.
