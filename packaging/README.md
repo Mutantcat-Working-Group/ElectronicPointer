@@ -14,7 +14,7 @@ pwsh packaging/publish.ps1 -Rid <RID> [-DateStamp <yyyymmdd>]
 `publish.ps1` 做的事是 `dotnet publish --self-contained`，再在输出目录里写一个 `buildstamp.txt`：
 
 ```text
-1.0.20260930
+1.0.20261001
 ```
 
 三个平台脚本都从这份文件取版本号和运行时标识，所以 `.deb`、`.AppImage`、`.dmg`、`.msix` 和 `-setup.exe` 的名字和内部版本永远一致，不会出现某个包忘了改版本号的情况。
@@ -32,9 +32,9 @@ bash packaging/linux/package.sh linux-x64
 
 | 产物 | 说明 |
 | --- | --- |
-| `electronicpointer_1.0.20260930_amd64.deb` | 装到 `/usr/lib/electronicpointer`，`/usr/bin/electronicpointer` 建软链，注册桌面入口和各尺寸图标 |
-| `ElectronicPointer-1.0.20260930-x86_64.AppImage` | 单文件，解压即用，不需要 root |
-| `electronicpointer-1.0.20260930-linux-x64.tar.gz` | 纯净目录树，适合塞进自建源或者 U 盘 |
+| `electronicpointer_1.0.20261001_amd64.deb` | 装到 `/usr/lib/electronicpointer`，`/usr/bin/electronicpointer` 建软链，注册桌面入口和各尺寸图标 |
+| `ElectronicPointer-1.0.20261001-x86_64.AppImage` | 单文件，解压即用，不需要 root |
+| `electronicpointer-1.0.20261001-linux-x64.tar.gz` | 纯净目录树，适合塞进自建源或者 U 盘 |
 
 三种产物装出来的可执行文件路径一致，都是 `/usr/lib/electronicpointer/ElectronicPointer`。应用在设置里打开「开机自启」时写的是 `~/.config/autostart/org.mutantcat.electronicpointer.desktop`，指向这个路径，所以无论用哪一种装上，自启都对。
 
@@ -61,8 +61,8 @@ bash packaging/macos/package.sh osx-arm64
 
 | 产物 | 说明 |
 | --- | --- |
-| `ElectronicPointer-1.0.20260930-osx-arm64.app` | 直接拖进 `/Applications` 的包 |
-| `ElectronicPointer-1.0.20260930-osx-arm64.dmg` | 装着上面那个 `.app` 的磁盘映像 |
+| `ElectronicPointer-1.0.20261001-osx-arm64.app` | 直接拖进 `/Applications` 的包 |
+| `ElectronicPointer-1.0.20261001-osx-arm64.dmg` | 装着上面那个 `.app` 的磁盘映像 |
 
 `.app` 里的 `Contents/MacOS` 就是原封不动的发布输出。.NET 会从这个目录旁边解析 `libSkiaSharp.dylib` 和 Avalonia 的原生库，所以搬家或者改链接只会把本来能用的东西弄坏。
 
@@ -92,15 +92,15 @@ pwsh packaging/windows/package.ps1 -Rid win-arm64
 
 | 产物 | 说明 |
 | --- | --- |
-| `ElectronicPointer-1.0.20260930-win-x64.zip` | 便携版，解压双击 |
-| `ElectronicPointer-1.0.20260930-win-x64.msix` | 安装版，带开始菜单项和卸载入口 |
-| `ElectronicPointer-1.0.20260930-win-x64-setup.exe` | NSIS 安装包，每机一份，带组件选择 |
+| `ElectronicPointer-1.0.20261001-win-x64.zip` | 便携版，解压双击 |
+| `ElectronicPointer-1.0.20261001-win-x64.msix` | 安装版，带开始菜单项和卸载入口 |
+| `ElectronicPointer-1.0.20261001-win-x64-setup.exe` | NSIS 安装包，每机一份，带组件选择 |
 
 MSIX 不是打包工程生成的，而是 `makeappx` 把发布输出加上 `AppxManifest.xml` 和 `Assets/` 直接打成包。这样整条 Windows 流水线只依赖 Windows PowerShell 和 Windows SDK，不需要 Visual Studio。
 
 包里的 `Identity Name` 加上 `Application Id` 拼出来是 `Mutantcat.ElectronicPointer.App`，和程序自己上报的 AUMID 是同一个字符串，自启动那一套要靠它对齐。
 
-MSIX 的 `Version` 是四段式，每段上限 65535，装不下 `20260929`，所以脚本用「距 2020-01-01 的天数」当 build 段（`1.0.20260930` → `1.0.2462.0`）：排序和日期戳一致，在「设置 - 应用」里看也还是可读的。`windows/assets/` 下的瓦片图标和 Linux 的 hicolor 图标同源。
+MSIX 的 `Version` 是四段式，每段上限 65535，装不下 `20261001`，所以脚本用「距 2020-01-01 的天数」当 build 段（`1.0.20261001` → `1.0.2465.0`）：排序和日期戳一致，在「设置 - 应用」里看也还是可读的。`windows/assets/` 下的瓦片图标和 Linux 的 hicolor 图标同源。
 
 签名参数：
 
