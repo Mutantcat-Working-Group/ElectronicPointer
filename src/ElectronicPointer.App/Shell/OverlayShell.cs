@@ -37,6 +37,7 @@ public sealed class OverlayShell : IDisposable
 {
     private readonly List<OverlayWindow> _overlays = new();
     private readonly List<(Hotkey Hotkey, Action Action)> _bindings = new();
+    private readonly List<(Hotkey Hotkey, string Description)> _refusedHotkeys = new();
     private readonly AppConfiguration _configuration = AppConfiguration.Load();
     private ToolbarWindow? _toolbar;
     private SettingsWindow? _settings;
@@ -79,6 +80,14 @@ public sealed class OverlayShell : IDisposable
     public bool CanRecognize => Platform.Recognizer.IsSupported;
 
     public bool CanAutoStart => Platform.AutoStart.IsSupported;
+
+    /// <summary>
+    /// The built-in gestures the host would not grant, in the order they were attempted.
+    /// A refusal is routine rather than exceptional, since another program owning the
+    /// combination or the OS reserving it both end the same way, and a gesture this app
+    /// cannot fire has to be kept somewhere it can be named instead of going quiet.
+    /// </summary>
+    public IReadOnlyList<(Hotkey Hotkey, string Description)> RefusedHotkeys => _refusedHotkeys;
 
     public void Start()
     {
@@ -254,16 +263,38 @@ public sealed class OverlayShell : IDisposable
         if (!Platform.Hotkeys.IsSupported)
             return;
 
-        foreach (var (hotkey, _) in DefaultHotkeys.All)
+        foreach (var (hotkey, description) in DefaultHotkeys.All)
         {
             // Control on macOS means Command, so the shared table is translated on the way
             // in rather than being written twice.
             var mapped = hotkey.OnThisPlatform();
             if (Platform.Hotkeys.Register(mapped))
                 _bindings.Add((mapped, ActionFor(hotkey)));
+            else
+                // Refused rather than fatal: whoever owns the combination keeps it, and
+                // naming what went missing beats leaving the user to discover it one
+                // silent keypress at a time. The settings page reads the same list back.
+                _refusedHotkeys.Add((mapped, description));
         }
 
         Platform.Hotkeys.Pressed += OnHotkeyPressed;
+
+        ReportRefusedHotkeys();
+    }
+
+    /// <summary>
+    /// The refusals are announced once, where the user is already looking. The status line
+    /// clears itself, so the settings' capability row is what keeps the list readable
+    /// afterwards. macOS rarely refuses a registration, and its own warning about a muted
+    /// event tap arrives later, so the two do not fight over the same line.
+    /// </summary>
+    private void ReportRefusedHotkeys()
+    {
+        if (_refusedHotkeys.Count == 0)
+            return;
+
+        var summary = HotkeyConflicts.Describe(_refusedHotkeys);
+        _toolbar?.ShowStatus($"部分快捷键被系统或其他程序占用，暂时无效：{summary}。占用释放后重启即可恢复。");
     }
 
     private Action ActionFor(Hotkey hotkey)

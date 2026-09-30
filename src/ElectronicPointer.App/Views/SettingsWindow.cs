@@ -9,6 +9,7 @@ using Avalonia.Platform.Storage;
 using Mutantcat.ElectronicPointer;
 using Mutantcat.ElectronicPointer.App.Shell;
 using Mutantcat.ElectronicPointer.App.Session;
+using Mutantcat.ElectronicPointer.Core.Input;
 using Mutantcat.ElectronicPointer.Platform;
 using Mutantcat.ElectronicPointer.Platform.Overlay;
 
@@ -338,13 +339,13 @@ public sealed class SettingsWindow : Window
     }
 
     /// <summary>The one-line reason a capability is unavailable on the running system.</summary>
-    private static string? NoteFor(PlatformFeature feature)
+    private string? NoteFor(PlatformFeature feature)
     {
         var windows = RuntimeInformation.IsOSPlatform(OSPlatform.Windows);
         var mac = RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
         var linux = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
 
-        return feature switch
+        var note = feature switch
         {
             PlatformFeature.GlobalHotkey when mac => "需要在「系统设置 > 隐私与安全性 > 辅助功能」中授权",
             PlatformFeature.GlobalHotkey when linux => "X11 会话可用，Wayland 会话受界面协议限制",
@@ -353,6 +354,17 @@ public sealed class SettingsWindow : Window
             PlatformFeature.HandwritingRecognition => "内置跨平台墨迹引擎，离线运行，整理结果可撤销",
             _ => null,
         };
+
+        // The row reports the host accepting global shortcuts as a whole, which stays true
+        // when a single gesture loses to another program, so the exceptions are named here.
+        // Without them the row reads "supported" over shortcuts that do nothing at all.
+        if (feature == PlatformFeature.GlobalHotkey && _shell.RefusedHotkeys.Count > 0)
+        {
+            var conflicts = HotkeyConflicts.Describe(_shell.RefusedHotkeys);
+            return note is null ? $"已被其他程序占用：{conflicts}" : $"{note}；已被其他程序占用：{conflicts}";
+        }
+
+        return note;
     }
 
     private static Control CapabilityRow(string label, bool supported, string? note)

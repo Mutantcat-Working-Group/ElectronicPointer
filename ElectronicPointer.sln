@@ -27,6 +27,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElectronicPointer.Platform.Linux.Tests", "tests\ElectronicPointer.Platform.Linux.Tests\ElectronicPointer.Platform.Linux.Tests.csproj", "{B41A4FB1-805D-42E4-9F65-9CC80858E401}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElectronicPointer.Platform.Windows.Tests", "tests\ElectronicPointer.Platform.Windows.Tests\ElectronicPointer.Platform.Windows.Tests.csproj", "{6CC2CC66-693F-40A1-8FDE-87F7555353BF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -157,6 +159,18 @@ Global
 		{B41A4FB1-805D-42E4-9F65-9CC80858E401}.Release|x64.Build.0 = Release|Any CPU
 		{B41A4FB1-805D-42E4-9F65-9CC80858E401}.Release|x86.ActiveCfg = Release|Any CPU
 		{B41A4FB1-805D-42E4-9F65-9CC80858E401}.Release|x86.Build.0 = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|x64.Build.0 = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Debug|x86.Build.0 = Debug|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|x64.ActiveCfg = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|x64.Build.0 = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|x86.ActiveCfg = Release|Any CPU
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -172,5 +186,6 @@ Global
 		{AC205C27-1039-4660-92AE-9D18BEAC8EBA} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6AF26427-E025-4747-8F37-EB53620606BE} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{B41A4FB1-805D-42E4-9F65-9CC80858E401} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{6CC2CC66-693F-40A1-8FDE-87F7555353BF} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

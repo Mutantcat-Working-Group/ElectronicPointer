@@ -1,5 +1,6 @@
 using Mutantcat.ElectronicPointer.Core.Input;
 using Mutantcat.ElectronicPointer.Platform.Input;
+using System.Collections.Concurrent;
 
 namespace Mutantcat.ElectronicPointer.Platform.Windows;
 
@@ -11,14 +12,51 @@ namespace Mutantcat.ElectronicPointer.Platform.Windows;
 /// </summary>
 internal sealed class HotkeySink : IDisposable
 {
-    private const string ClassName = "ElectronicPointerHotkeySink";
+    // Windows keeps one window class per name, and the class carries the window
+    // procedure that every window built from it is driven by. Two sinks sharing a name
+    // would leave the second one's window answered by the first one's procedure, so the
+    // queue nobody drains and a registration that waits out its timeout. A counter per
+    // process gives every sink a class of its own.
+    private static int _classCounter;
+
+    private readonly string _className =
+        $"ElectronicPointerHotkeySink{Interlocked.Increment(ref _classCounter)}";
+
+
+    // WM_CLOSE asks the window to go away, and the private message parks a draining
+    // pass over the queue: GetMessage sleeps until something arrives, so work that
+    // nothing announced would otherwise wait for the next keypress to be noticed.
+    private const uint WmClose = 0x0010;
+    private const uint WmRunQueuedWork = 0x8001; // WM_APP + 1
+
+    // A bound on the wait for the sink thread's answer, so a wedged sink cannot hang
+    // the caller for good. The window is up before anything is queued, so an answer is
+    // a message round trip away rather than a second of waiting.
+    private static readonly TimeSpan RoundTripTimeout = TimeSpan.FromSeconds(5);
+
+    private enum WorkKind
+    {
+        Register,
+        Unregister,
+        UnregisterAll,
+    }
+
+    private readonly record struct QueuedWork(WorkKind Kind, Hotkey Hotkey, TaskCompletionSource<bool> Completion);
+
     private readonly Lock _gate = new();
     private readonly Dictionary<int, Hotkey> _registrations = new();
     private readonly Action<Hotkey> _onPressed;
     private readonly NativeMethods.WindowProc _windowProc;
+
+    // RegisterHotKey, UnregisterHotKey and DestroyWindow all refuse a window another
+    // thread created, which ends in ERROR_WINDOW_OF_OTHER_THREAD and a gesture that
+    // looks owned when nothing else holds it. Everything touching the window therefore
+    // runs on the sink thread through this queue and is answered by a task.
+    private readonly ConcurrentQueue<QueuedWork> _queue = new();
     private Thread? _thread;
     private readonly ManualResetEventSlim _ready = new(false);
     private IntPtr _hwnd;
+    private int _sinkThread = -1;
     private int _nextId = 1;
     private bool _disposed;
 
@@ -42,9 +80,64 @@ internal sealed class HotkeySink : IDisposable
     /// <summary>Registers a gesture. Returns false when the OS already granted it away.</summary>
     public bool Register(Hotkey hotkey)
     {
-        if (!IsAlive)
+        if (!WaitForSink())
             return false;
 
+        // A caller already on the sink thread has to answer on the spot: the loop that
+        // would run the queue is the one calling, and waiting for it waits for itself.
+        if (OnSinkThread)
+            return RegisterCore(hotkey);
+
+        return Ask(WorkKind.Register, hotkey);
+    }
+
+    public bool Unregister(Hotkey hotkey)
+    {
+        if (!WaitForSink())
+            return false;
+
+        if (OnSinkThread)
+            return UnregisterCore(hotkey);
+
+        return Ask(WorkKind.Unregister, hotkey);
+    }
+
+    public void UnregisterAll()
+    {
+        if (!WaitForSink())
+            return;
+
+        if (OnSinkThread)
+        {
+            UnregisterAllCore();
+            return;
+        }
+
+        _ = Ask(WorkKind.UnregisterAll, default);
+    }
+
+    /// <summary>Queues work for the sink thread and waits for the answer it owes.</summary>
+    private bool Ask(WorkKind kind, Hotkey hotkey)
+    {
+        var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _queue.Enqueue(new QueuedWork(kind, hotkey, completion));
+        Wake();
+        return completion.Task.Wait(RoundTripTimeout) && completion.Task.Result;
+    }
+
+    private void Wake()
+    {
+        var handle = _hwnd;
+        if (handle != IntPtr.Zero)
+            NativeMethods.PostMessage(handle, WmRunQueuedWork, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private bool WaitForSink() => IsAlive && !_disposed;
+
+    private bool OnSinkThread => Environment.CurrentManagedThreadId == _sinkThread;
+
+    private bool RegisterCore(Hotkey hotkey)
+    {
         var virtualKey = ToVirtualKey(hotkey.Key);
         if (virtualKey == 0)
             return false;
@@ -66,11 +159,8 @@ internal sealed class HotkeySink : IDisposable
         }
     }
 
-    public bool Unregister(Hotkey hotkey)
+    private bool UnregisterCore(Hotkey hotkey)
     {
-        if (!IsAlive)
-            return false;
-
         lock (_gate)
         {
             var match = _registrations.FirstOrDefault(pair => pair.Value == hotkey).Key;
@@ -85,17 +175,35 @@ internal sealed class HotkeySink : IDisposable
         }
     }
 
-    public void UnregisterAll()
+    private bool UnregisterAllCore()
     {
-        if (!IsAlive)
-            return;
-
         lock (_gate)
         {
             foreach (var id in _registrations.Keys)
                 NativeMethods.UnregisterHotKey(_hwnd, id);
 
             _registrations.Clear();
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Runs whatever the queue holds. On the sink thread from the message loop: once at
+    /// start up for work queued while the window was coming up, and on the wake message
+    /// after that.
+    /// </summary>
+    private void RunQueuedWork()
+    {
+        while (_queue.TryDequeue(out var work))
+        {
+            var result = work.Kind switch
+            {
+                WorkKind.Register => RegisterCore(work.Hotkey),
+                WorkKind.Unregister => UnregisterCore(work.Hotkey),
+                _ => UnregisterAllCore(),
+            };
+
+            work.Completion.TrySetResult(result);
         }
     }
 
@@ -134,14 +242,14 @@ internal sealed class HotkeySink : IDisposable
             Cursor = IntPtr.Zero,
             BackgroundBrush = IntPtr.Zero,
             MenuName = null,
-            ClassName = ClassName,
+            ClassName = _className,
         };
 
         NativeMethods.RegisterClass(ref attributes);
 
         _hwnd = NativeMethods.CreateWindowEx(
             0,
-            ClassName,
+            _className,
             "ElectronicPointer",
             0,
             0,
@@ -153,10 +261,17 @@ internal sealed class HotkeySink : IDisposable
             instance,
             IntPtr.Zero);
 
+        // The sink names its own thread before anything is allowed to wait on the
+        // window, so a registration from anywhere else can be told where it travels.
+        _sinkThread = Environment.CurrentManagedThreadId;
         _ready.Set();
 
         if (_hwnd == IntPtr.Zero)
             return;
+
+        // Work queued while the window was coming up had no window to wake a loop that
+        // had not parked in GetMessage yet, so the queue is drained once here first.
+        RunQueuedWork();
 
         while (!_disposed && NativeMethods.GetMessage(out var message, _hwnd, 0, 0) != 0)
         {
@@ -178,6 +293,21 @@ internal sealed class HotkeySink : IDisposable
             }
 
             _onPressed(hotkey);
+            return IntPtr.Zero;
+        }
+
+        if (message == WmRunQueuedWork)
+        {
+            RunQueuedWork();
+            return IntPtr.Zero;
+        }
+
+        if (message == WmClose)
+        {
+            // The unregistering and the destroying belong to this thread, so a close
+            // request is answered here rather than wherever it was posted from.
+            UnregisterAllCore();
+            NativeMethods.DestroyWindow(hwnd);
             return IntPtr.Zero;
         }
 
@@ -294,15 +424,20 @@ internal sealed class HotkeySink : IDisposable
         if (_disposed)
             return;
 
+        // The thread, not this caller, owns the window: the close message asks it to
+        // unregister and destroy, and the join waits for that answer with a bound,
+        // because the process is on its way out either way. A DestroyWindow from here
+        // would be refused with the same cross thread error the hotkey calls hit.
         _disposed = true;
-        UnregisterAll();
 
         var handle = _hwnd;
-        _hwnd = IntPtr.Zero;
-        _ready.Dispose();
-
         if (handle != IntPtr.Zero)
-            NativeMethods.DestroyWindow(handle);
+        {
+            NativeMethods.PostMessage(handle, WmClose, IntPtr.Zero, IntPtr.Zero);
+            _thread?.Join(TimeSpan.FromSeconds(2));
+        }
+
+        _ready.Dispose();
     }
 }
 
