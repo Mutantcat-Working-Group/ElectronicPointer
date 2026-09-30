@@ -26,7 +26,9 @@ public sealed class ToolbarWindow : Window
 {
     private readonly OverlayShell _shell;
     private readonly WrapPanel _groups = new() { Orientation = Orientation.Horizontal };
-    private readonly Button[] _toolButtons = new Button[4];
+    // Sized from the tool list below, so the two cannot drift apart: a button added without
+    // a tool, or a tool without a button, fails loudly instead of pointing the wrong way.
+    private readonly Button[] _toolButtons = new Button[PaletteTools.Length];
     private readonly Button[] _colorButtons;
     private readonly Slider _sizeSlider = new();
     private readonly TextBlock _sizeLabel = new();
@@ -38,6 +40,7 @@ public sealed class ToolbarWindow : Window
     private readonly ToggleSwitch _passThrough = new();
     private Button _freezeButton = null!;
     private Button _recognizeButton = null!;
+    private Button _removePageButton = null!;
     private readonly TextBlock _statusLabel = new();
     private DispatcherTimer? _statusTimer;
     private bool _refreshing;
@@ -45,6 +48,12 @@ public sealed class ToolbarWindow : Window
     // The palette travels with the canvases rather than being one of them, so it needs the
     // same lift they are given before it can be clicked at all.
     private readonly OverlayCompanion _companion = null!;
+
+    // The tools the palette offers, in button order. Kept as a list rather than cast from
+    // the button index: ToolKind gains members over time, and a cast would quietly point a
+    // button at whichever tool happens to share that number.
+    private static readonly ToolKind[] PaletteTools =
+        { ToolKind.Pen, ToolKind.Highlighter, ToolKind.Eraser, ToolKind.Select };
 
     public ToolbarWindow(OverlayShell shell)
     {
@@ -280,6 +289,7 @@ public sealed class ToolbarWindow : Window
         var previous = FlatButton("上一页", DefaultHotkeys.PreviousPage.OnThisPlatform().Text, _shell.Session.PreviousPage);
         var next = FlatButton("下一页", DefaultHotkeys.NextPage.OnThisPlatform().Text, _shell.Session.NextPage);
         var add = FlatButton("新建页", DefaultHotkeys.NewPage.OnThisPlatform().Text, _shell.Session.AddPage);
+        _removePageButton = FlatButton("删除页", "删除当前这一页，删除后可以撤销找回", _shell.Session.RemovePage);
 
         _pageLabel.Text = "1 / 1";
         _pageLabel.Width = 48;
@@ -292,6 +302,7 @@ public sealed class ToolbarWindow : Window
         panel.Children.Add(next);
         panel.Children.Add(Separator());
         panel.Children.Add(add);
+        panel.Children.Add(_removePageButton);
         _groups.Children.Add(Segment("页面", panel));
     }
 
@@ -492,7 +503,7 @@ public sealed class ToolbarWindow : Window
 
         for (var i = 0; i < _toolButtons.Length; i++)
         {
-            var tool = (ToolKind)i;
+            var tool = PaletteTools[i];
             _toolButtons[i].Tag = session.Tool == tool ? "Active" : null;
             _toolButtons[i].Background = new SolidColorBrush(
                 session.Tool == tool ? Color.Parse("#0B6CD4") : Color.Parse("#F2F4F7"));
@@ -524,6 +535,9 @@ public sealed class ToolbarWindow : Window
         _sizeLabel.Text = $"{Math.Round(_sizeSlider.Value)}{unit}";
 
         _pageLabel.Text = $"{session.PageIndex} / {session.PageCount}";
+        // A board with one page is a board already: pressing delete would do nothing, so
+        // the button says so by being unclickable rather than by failing quietly.
+        _removePageButton.IsEnabled = session.PageCount > 1;
         _undoButton.IsEnabled = session.CanUndo;
         _redoButton.IsEnabled = session.CanRedo;
         _passThrough.IsChecked = session.PassThrough;
