@@ -42,7 +42,9 @@ public sealed class ToolbarWindow : Window
     private DispatcherTimer? _statusTimer;
     private bool _refreshing;
 
-    private IOverlayChrome? _chrome;
+    // The palette travels with the canvases rather than being one of them, so it needs the
+    // same lift they are given before it can be clicked at all.
+    private readonly OverlayCompanion _companion = null!;
 
     public ToolbarWindow(OverlayShell shell)
     {
@@ -50,6 +52,7 @@ public sealed class ToolbarWindow : Window
 
         _shell = shell;
         _colorButtons = new Button[InkPalette.Colors.Length];
+        _companion = new OverlayCompanion(_shell.Platform);
 
         // Fixed width and trimmed: the outcome of a save or a recognition is longer than
         // the palette is prepared to grow for, and a palette that resizes under the user's
@@ -134,25 +137,13 @@ public sealed class ToolbarWindow : Window
     /// </summary>
     internal void LiftAboveOverlays()
     {
-        if (_chrome is null)
-        {
-            if (TryGetPlatformHandle() is not { } handle)
-                return;
-
-            _chrome = _shell.Platform.CreateOverlayChrome();
-            _chrome.AttachCompanion(new AvaloniaHandle(handle.Handle));
-            return;
-        }
-
-        if (TryGetPlatformHandle() is { } existing)
-            _chrome.AttachCompanion(new AvaloniaHandle(existing.Handle));
+        _companion.Lift(this, CompanionRole.Palette);
     }
 
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
-        _chrome?.DetachCompanion();
-        _chrome = null;
+        _companion.Release();
     }
 
     private void OnLayoutUpdated(object? sender, EventArgs e)

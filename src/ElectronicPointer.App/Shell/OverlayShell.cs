@@ -144,12 +144,17 @@ public sealed class OverlayShell : IDisposable
     /// </summary>
     private void BuildOverlays()
     {
+        // Read once: the desks reports are free to shift while the windows are being created,
+        // and the signature written at the end has to describe the canvases just built rather
+        // than a list that quietly became a different one.
+        var screens = AvailableScreens();
+
         foreach (var overlay in _overlays.ToArray())
             overlay.Close();
 
         _overlays.Clear();
 
-        foreach (var screen in AvailableScreens())
+        foreach (var screen in screens)
         {
             var overlay = new OverlayWindow(screen);
             _overlays.Add(overlay);
@@ -162,9 +167,13 @@ public sealed class OverlayShell : IDisposable
         MainWindow = _overlays.Count > 0 ? _overlays[0] : _toolbar!;
 
         // Every canvas above asked to be on top of whatever it was ordered after, so the
-        // palette has to be lifted once more now that all of them exist: left alone it
-        // would sit under the first canvas it used to cover.
+        // windows that travel with the canvases have to be lifted once more now that all of
+        // them exist: left alone they would sit under the first canvas they used to cover,
+        // which for the settings dialog means opening onto ink that hides it completely.
         _toolbar?.LiftAboveOverlays();
+
+        if (_settings is { IsVisible: true })
+            _settings.LiftAboveOverlays();
 
         // The lifetime keeps its own reference to the main window, and it has to follow the
         // new surface. A lifetime still holding a window that was closed is how an app
@@ -172,7 +181,7 @@ public sealed class OverlayShell : IDisposable
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             desktop.MainWindow = MainWindow;
 
-        _screenSignature = ScreenSignature(AvailableScreens());
+        _screenSignature = ScreenSignature(screens);
     }
 
     private void Track(Window window)

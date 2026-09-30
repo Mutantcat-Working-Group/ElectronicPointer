@@ -82,12 +82,15 @@ public sealed class X11OverlayChrome : IOverlayChrome
     }
 
     /// <summary>
-    /// The tool palette, asked to stay above the canvases. A window manager is free to
-    /// ignore an EWMH hint, so the request simply goes out; the palette is re-raised
-    /// whenever a canvas is rebuilt, because a manager that honours the hint honours it for
-    /// whichever window asked last.
+    /// A companion, asked to stay above the canvases. A window manager is free to ignore
+    /// an EWMH hint, so the request simply goes out; the companion is re-raised whenever a
+    /// canvas is rebuilt, because a manager that honours the hint honours it for whichever
+    /// window asked last.
+    ///
+    /// The role is not consulted: the request is a set of window states, and X draws no
+    /// distinction between a palette that must not take focus and a dialog that must.
     /// </summary>
-    public bool AttachCompanion(IOverlayWindowTarget target)
+    public bool AttachCompanion(IOverlayWindowTarget target, CompanionRole role)
     {
         if (!IsSupported || target is not { Handle: not 0 })
             return false;
@@ -117,6 +120,15 @@ public sealed class X11OverlayChrome : IOverlayChrome
         }
 
         _companion = 0;
+
+        // A companion owns no canvas, so nothing else is ever going to close the connection
+        // it opened. Closing it here is what keeps a dialog that is opened and closed again
+        // and again from leaving one display connection behind every time.
+        if (_window == 0 && _display != 0)
+        {
+            _ = X11NativeMethods.XCloseDisplay(_display);
+            _display = 0;
+        }
     }
 
     public void Detach()

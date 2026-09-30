@@ -10,6 +10,7 @@ using Mutantcat.ElectronicPointer;
 using Mutantcat.ElectronicPointer.App.Shell;
 using Mutantcat.ElectronicPointer.App.Session;
 using Mutantcat.ElectronicPointer.Platform;
+using Mutantcat.ElectronicPointer.Platform.Overlay;
 
 namespace Mutantcat.ElectronicPointer.App.Views;
 
@@ -23,6 +24,7 @@ namespace Mutantcat.ElectronicPointer.App.Views;
 public sealed class SettingsWindow : Window
 {
     private readonly OverlayShell _shell;
+    private readonly OverlayCompanion _companion;
     private readonly ToggleSwitch _autoStart = new();
     private readonly TextBlock _status = new();
 
@@ -44,6 +46,7 @@ public sealed class SettingsWindow : Window
         ArgumentNullException.ThrowIfNull(shell);
 
         _shell = shell;
+        _companion = new OverlayCompanion(_shell.Platform);
 
         Title = AppIdentity.GetDisplayName() + " 设置";
         Width = 520;
@@ -52,6 +55,12 @@ public sealed class SettingsWindow : Window
         CanResize = false;
         RequestedThemeVariant = ThemeVariant.Light;
         Background = new SolidColorBrush(Color.Parse("#F4F6F9"));
+
+        // The desk is covered in topmost ink while this is open, so an ordinary window would
+        // be painted underneath all of it: the dialog opens, and nothing arrives. Joining the
+        // same layer is also the fallback for a host whose chrome cannot lift it, such as a
+        // Wayland session, where the canvases are not on top either.
+        Topmost = true;
 
         var page = new StackPanel { Margin = new Thickness(18), Spacing = 16 };
         page.Children.Add(BuildGeneralSection());
@@ -97,10 +106,21 @@ public sealed class SettingsWindow : Window
         });
         Content = root;
 
+        Opened += OnOpened;
         Closed += OnClosed;
     }
 
     private readonly StackPanel _footerHost;
+
+    /// <summary>
+    /// Lifts the dialog above the canvases once it has a native handle to hand over, the same
+    /// way the palette is lifted. Windows put an ordinary window below every topmost canvas,
+    /// and AppKit stacks strictly by level, so without this the dialog is simply not there.
+    /// </summary>
+    private void OnOpened(object? sender, EventArgs e) => LiftAboveOverlays();
+
+    /// <summary>Called again after the canvases are rebuilt, which buries a window left behind.</summary>
+    internal void LiftAboveOverlays() => _companion.Lift(this, CompanionRole.Dialog);
 
     private Control BuildGeneralSection()
     {
@@ -403,6 +423,9 @@ public sealed class SettingsWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        // The lift is let go before the configuration is written, so a dialog that fails to
+        // save for any reason still leaves the window plain on its way out.
+        _companion.Release();
         _shell.SaveConfiguration();
         _autoStart.IsCheckedChanged -= OnAutoStartChanged;
     }

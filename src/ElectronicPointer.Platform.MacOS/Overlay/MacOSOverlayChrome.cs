@@ -15,9 +15,10 @@ namespace Mutantcat.ElectronicPointer.Platform.MacOS;
 ///   the "ignore cycle" bit, plus <c>orderFrontRegardless</c> so the overlay paints even
 ///   while another app is frontmost.
 ///
-/// The tool palette is a companion rather than a canvas: it is put at the status window
-/// level, one step above the floating canvases, because AppKit stacks strictly by level
-/// and a palette left at the ordinary level would sit under ink that cannot be clicked.
+/// Windows that travel with the canvases are companions rather than canvases: the tool
+/// palette and the settings dialog are put at the status window level, one step above the
+/// floating canvases, because AppKit stacks strictly by level and a companion left at the
+/// ordinary level would sit under ink that cannot be clicked.
 ///
 /// AppKit is main-thread only, so callers must be on the UI thread. Every member reports
 /// whether it applied, which is how the UI learns the window refused a change.
@@ -54,12 +55,18 @@ public sealed class MacOSOverlayChrome : IOverlayChrome
     }
 
     /// <summary>
-    /// The tool palette, lifted one window level above every canvas. AppKit stacks by
-    /// level first and only then by order, so a companion left at the ordinary level stays
+    /// A companion, lifted one window level above every canvas. AppKit stacks by level
+    /// first and only then by order, so a companion left at the ordinary level stays
     /// underneath the floating canvases no matter how often it is ordered to the front,
-    /// and the buttons that offer a way out of the app cannot be clicked at all.
+    /// and the buttons that offer a way out of the app cannot be clicked at all. The
+    /// settings dialog needs the same lift for the same reason: it opens with ink over
+    /// every display, and an ordinary-level window would be painted under all of it.
+    ///
+    /// Only the palette is turned into a non-activating panel. A dialog is left
+    /// activatable on purpose: it has sentences to read and controls to reach with the
+    /// keyboard, and a window that cannot become the key window gives up both.
     /// </summary>
-    public bool AttachCompanion(IOverlayWindowTarget target)
+    public bool AttachCompanion(IOverlayWindowTarget target, CompanionRole role)
     {
         if (!IsSupported || target is not { Handle: not 0 })
             return false;
@@ -76,15 +83,19 @@ public sealed class MacOSOverlayChrome : IOverlayChrome
             Sel("setCollectionBehavior:"),
             (nuint)CompanionBehaviour());
 
-        // The existing style mask is read back rather than replaced, so the frameless,
-        // non-activating bits Avalonia already chose survive this addition.
-        var style = MacOSNativeMethods.ObjcSendNoArgs(_companion, Sel("styleMask"));
-        MacOSNativeMethods.ObjcSendUlong(
-            _companion,
-            Sel("setStyleMask:"),
-            (nuint)(style | NonactivatingPanelMask));
+        if (role == CompanionRole.Palette)
+        {
+            // The existing style mask is read back rather than replaced, so the frameless,
+            // non-activating bits Avalonia already chose survive this addition.
+            var style = MacOSNativeMethods.ObjcSendNoArgs(_companion, Sel("styleMask"));
+            MacOSNativeMethods.ObjcSendUlong(
+                _companion,
+                Sel("setStyleMask:"),
+                (nuint)(style | NonactivatingPanelMask));
 
-        MacOSNativeMethods.ObjcSendBool(_companion, Sel("setMovableByWindowBackground:"), false);
+            MacOSNativeMethods.ObjcSendBool(_companion, Sel("setMovableByWindowBackground:"), false);
+        }
+
         OrderFrontRegardless(_companion);
         return true;
     }

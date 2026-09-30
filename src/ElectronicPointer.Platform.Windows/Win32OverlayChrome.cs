@@ -40,12 +40,17 @@ public sealed class Win32OverlayChrome : IOverlayChrome
     }
 
     /// <summary>
-    /// Puts the tool palette above every canvas. Being top-most is not enough on its own,
-    /// because the canvases are top-most too and are opened afterwards, so the palette is
+    /// Puts a companion above every canvas. Being top-most is not enough on its own,
+    /// because the canvases are top-most too and are opened afterwards, so a companion is
     /// ordered after them and has to be re-ordered whenever a canvas is rebuilt. The call
     /// is idempotent for exactly that reason.
+    ///
+    /// The role is left unread on purpose. Windows expresses "above the canvases" as a
+    /// z-order insertion that neither activates nor blocks activating the window, so a
+    /// palette that must never steal focus and a dialog that must take it need the same
+    /// call and get different outcomes from the activation they already have.
     /// </summary>
-    public bool AttachCompanion(IOverlayWindowTarget target)
+    public bool AttachCompanion(IOverlayWindowTarget target, CompanionRole role)
     {
         ArgumentNullException.ThrowIfNull(target);
 

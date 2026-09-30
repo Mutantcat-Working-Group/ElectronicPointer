@@ -25,7 +25,7 @@ public sealed class UnsupportedOverlayChrome : IOverlayChrome
     {
     }
 
-    public bool AttachCompanion(IOverlayWindowTarget target) => false;
+    public bool AttachCompanion(IOverlayWindowTarget target, CompanionRole role) => false;
 
     public void DetachCompanion()
     {
