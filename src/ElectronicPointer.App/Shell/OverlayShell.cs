@@ -382,7 +382,7 @@ public sealed class OverlayShell : IDisposable
     }
 
     /// <summary>
-    /// The display the pen is on, plus the screen Avalonia thinks lives there. The capture
+    /// The display to grab, plus the screen Avalonia thinks lives there. The capture
     /// service and Avalonia enumerate displays independently, so the two are matched by
     /// size: a grab taken on the monitor to the right has to land on the right.
     /// </summary>

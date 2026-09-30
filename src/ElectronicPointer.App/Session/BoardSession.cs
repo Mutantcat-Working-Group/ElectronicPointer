@@ -132,7 +132,12 @@ public sealed class BoardSession
         }
     }
 
-    /// <summary>Which overlay screen "freeze screen" grabs, as an index into the shell's list.</summary>
+    /// <summary>
+    /// Which display "freeze screen" grabs, as an index into the shell's list. Nothing in
+    /// the app writes it yet, so a grab always lands on the first display until there is a
+    /// way to point at a screen and say "this one"; it is persisted because the plumbing
+    /// survives the restart that will follow that feature.
+    /// </summary>
     public int FrozenScreenIndex
     {
         get => _frozenScreenIndex;
