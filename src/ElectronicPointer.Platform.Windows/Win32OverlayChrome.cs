@@ -69,7 +69,7 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             try
             {
                 NativeMethods.SetWindowLong(_target.Handle, NativeMethods.GwlExStyle, _originalStyle);
-            ApplyStyles(SetWindowPosFrameChanged);
+                ApplyStyles(SetWindowPosFrameChanged);
             }
             catch (Win32Exception)
             {

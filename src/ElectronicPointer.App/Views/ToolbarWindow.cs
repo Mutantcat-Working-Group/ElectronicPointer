@@ -72,7 +72,14 @@ public sealed class ToolbarWindow : Window
         MinWidth = 460;
         SizeToContent = SizeToContent.Height;
         RequestedThemeVariant = ThemeVariant.Light;
-        Background = new SolidColorBrush(Color.Parse("#F4F6F9"));
+        // The palette's shape is the card below and nothing else: a window that paints its
+        // own opaque background puts a square sheet under the card's rounded corners, and
+        // whatever the window manager then does to a frameless window (Windows 11 rounds
+        // them on its own, older systems do not) lands on top of what the application drew,
+        // so no two corners end up agreeing. Letting the window stay transparent hands all
+        // four corners to the card, which is the same thing the ink canvas does.
+        Background = Brushes.Transparent;
+        TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
 
         var frame = new Border
         {

@@ -40,7 +40,10 @@ internal static partial class NativeMethods
     // the corners of a frameless window whether the application asked for it or not.
     public const int DwmwaWindowCornerPreference = 33;
 
-    public const int DwmwcpDoNotRound = 2;
+    // DWM_WINDOW_CORNER_PREFERENCE: 0 default, 1 do not round, 2 round, 3 round small.
+    // Two is the value that asks for the system's rounding, so 1 is the only one that
+    // keeps the application's own corners on the screen.
+    public const int DwmwcpDoNotRound = 1;
 
     public const int SmXVirtualScreen = 76;
     public const int SmYVirtualScreen = 77;
