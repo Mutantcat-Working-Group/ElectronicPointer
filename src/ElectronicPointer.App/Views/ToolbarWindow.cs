@@ -9,7 +9,9 @@ using Avalonia.Threading;
 using Mutantcat.ElectronicPointer.App.Session;
 using Mutantcat.ElectronicPointer.App.Shell;
 using Mutantcat.ElectronicPointer;
+using Mutantcat.ElectronicPointer.Core.Input;
 using Mutantcat.ElectronicPointer.Core.Ink;
+using Mutantcat.ElectronicPointer.Platform.Overlay;
 
 namespace Mutantcat.ElectronicPointer.App.Views;
 
@@ -39,6 +41,8 @@ public sealed class ToolbarWindow : Window
     private readonly TextBlock _statusLabel = new();
     private DispatcherTimer? _statusTimer;
     private bool _refreshing;
+
+    private IOverlayChrome? _chrome;
 
     public ToolbarWindow(OverlayShell shell)
     {
@@ -110,7 +114,38 @@ public sealed class ToolbarWindow : Window
         // window never had and drifts away from the bottom edge, which is what X11 and
         // AppKit both show because they map the window before that pass runs.
         LayoutUpdated += OnLayoutUpdated;
+        LiftAboveOverlays();
         Opacity = 1;
+    }
+
+    /// <summary>
+    /// Asks the host to keep the palette above every canvas. The canvases float higher than
+    /// ordinary windows, so a palette left at the ordinary level is buried under ink that
+    /// swallows the click meant for its buttons: on macOS that used to leave the user with
+    /// nothing to press at all. Canvases are rebuilt whenever the display list changes, and
+    /// each new canvas asks to be on top again, so this is called once more after that.
+    /// </summary>
+    internal void LiftAboveOverlays()
+    {
+        if (_chrome is null)
+        {
+            if (TryGetPlatformHandle() is not { } handle)
+                return;
+
+            _chrome = _shell.Platform.CreateOverlayChrome();
+            _chrome.AttachCompanion(new AvaloniaHandle(handle.Handle));
+            return;
+        }
+
+        if (TryGetPlatformHandle() is { } existing)
+            _chrome.AttachCompanion(new AvaloniaHandle(existing.Handle));
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        _chrome?.DetachCompanion();
+        _chrome = null;
     }
 
     private void OnLayoutUpdated(object? sender, EventArgs e)
@@ -244,9 +279,9 @@ public sealed class ToolbarWindow : Window
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
 
-        var previous = FlatButton("上一页", "Ctrl+PageUp", _shell.Session.PreviousPage);
-        var next = FlatButton("下一页", "Ctrl+PageDown", _shell.Session.NextPage);
-        var add = FlatButton("新建页", "Ctrl+N", _shell.Session.AddPage);
+        var previous = FlatButton("上一页", DefaultHotkeys.PreviousPage.OnThisPlatform().Text, _shell.Session.PreviousPage);
+        var next = FlatButton("下一页", DefaultHotkeys.NextPage.OnThisPlatform().Text, _shell.Session.NextPage);
+        var add = FlatButton("新建页", DefaultHotkeys.NewPage.OnThisPlatform().Text, _shell.Session.AddPage);
 
         _pageLabel.Text = "1 / 1";
         _pageLabel.Width = 48;
@@ -266,11 +301,11 @@ public sealed class ToolbarWindow : Window
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
 
-        _undoButton = FlatButton("撤销", "Ctrl+Z", _shell.Session.Undo);
-        _redoButton = FlatButton("重做", "Ctrl+Shift+Z", _shell.Session.Redo);
+        _undoButton = FlatButton("撤销", DefaultHotkeys.Undo.OnThisPlatform().Text, _shell.Session.Undo);
+        _redoButton = FlatButton("重做", DefaultHotkeys.Redo.OnThisPlatform().Text, _shell.Session.Redo);
         panel.Children.Add(_undoButton);
         panel.Children.Add(_redoButton);
-        panel.Children.Add(FlatButton("清空", "Ctrl+Shift+Del", _shell.Session.ClearPage));
+        panel.Children.Add(FlatButton("清空", DefaultHotkeys.ClearPage.OnThisPlatform().Text, _shell.Session.ClearPage));
 
         _groups.Children.Add(Segment("编辑", panel));
     }
@@ -283,7 +318,9 @@ public sealed class ToolbarWindow : Window
         _passThrough.IsChecked = _shell.Session.PassThrough;
         _passThrough.VerticalAlignment = VerticalAlignment.Center;
         _passThrough.FontSize = 13;
-        ToolTip.SetTip(_passThrough, "Ctrl+Alt+T：开启后鼠标落在桌面上，关闭后才能在屏幕上书写");
+        ToolTip.SetTip(
+            _passThrough,
+            $"{DefaultHotkeys.TogglePassThrough.OnThisPlatform().Text}：开启后鼠标落在桌面上，关闭后才能在屏幕上书写");
 
         _passThrough.IsCheckedChanged += (_, _) =>
         {
@@ -310,14 +347,17 @@ public sealed class ToolbarWindow : Window
 
         panel.Children.Add(FlatButton("保存图片", "把当前页导出为图片", () => _ = OnSaveImageAsync()));
         panel.Children.Add(FlatButton("设置", null, () => { _shell.ShowSettings(); }));
-        panel.Children.Add(FlatButton("退出", "Ctrl+Q", () => _shell.Quit()));
+        panel.Children.Add(FlatButton("退出", DefaultHotkeys.Quit.OnThisPlatform().Text, () => _shell.Quit()));
         panel.Children.Add(Separator());
         panel.Children.Add(_statusLabel);
         _groups.Children.Add(Segment("文件", panel));
     }
 
-    /// <summary>The outcome of a press that has no other visible result to show.</summary>
-    private void ReportStatus(string message)
+    /// <summary>
+    /// The outcome of a press that has no other visible result to show, and the place a
+    /// platform finding is reported: a shortcut that cannot fire, for instance.
+    /// </summary>
+    public void ShowStatus(string message)
     {
         _statusLabel.Text = message;
         // The label clips so it cannot push the palette wider, so the full sentence is
@@ -343,8 +383,8 @@ public sealed class ToolbarWindow : Window
 
     private async Task OnSaveImageAsync()
     {
-        ReportStatus("正在导出…");
-        ReportStatus(await _shell.SaveImageAsync());
+        ShowStatus("正在导出…");
+        ShowStatus(await _shell.SaveImageAsync());
     }
 
     private static Border Segment(string label, Panel content)
@@ -408,27 +448,27 @@ public sealed class ToolbarWindow : Window
         var recognizer = _shell.Platform.Recognizer;
         if (!recognizer.IsSupported)
         {
-            ReportStatus("当前平台没有可用的墨迹引擎。");
+            ShowStatus("当前平台没有可用的墨迹引擎。");
             return;
         }
 
         _recognizeButton.IsEnabled = false;
-        ReportStatus("正在识别…");
+        ShowStatus("正在识别…");
 
         try
         {
             var report = await _shell.Session.RecognizeAsync(recognizer, default);
-            ReportStatus(report.Summary);
+            ShowStatus(report.Summary);
         }
         catch (OperationCanceledException)
         {
-            ReportStatus("已取消识别。");
+            ShowStatus("已取消识别。");
         }
         catch (Exception exception)
         {
             // Recognition sits on top of the board, never under it: the ink, the undo
             // history and the toolbar all have to survive an engine that misbehaves.
-            ReportStatus($"识别失败：{exception.Message}");
+            ShowStatus($"识别失败：{exception.Message}");
         }
         finally
         {

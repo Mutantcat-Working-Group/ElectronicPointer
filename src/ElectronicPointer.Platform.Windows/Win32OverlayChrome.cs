@@ -12,12 +12,20 @@ namespace Mutantcat.ElectronicPointer.Platform.Windows;
 ///   slideshow.
 /// - <see cref="WsExToolWindow"/> keeps the overlay out of the task bar and Alt+Tab.
 ///
-/// The toolbar lives inside the same window, so pass-through mode also hides the toolbar:
-/// a click-through window cannot be clicked, buttons included.
+/// The tool palette is a companion, not a canvas: it lives in the same top-most group but
+/// is ordered after every canvas, so a palette that opened first is not buried under the
+/// ink it drives.
+///
+/// Windows 11 rounds the corners of every frameless window on its own, while the palette
+/// draws an eight pixel radius of its own. The two cannot both win, so the system's
+/// rounding is switched off on both windows and the application's stays the only one.
 /// </summary>
 public sealed class Win32OverlayChrome : IOverlayChrome
 {
     private IOverlayWindowTarget? _target;
+
+    private IOverlayWindowTarget? _companion;
+
     private int _originalStyle;
 
     public bool IsSupported => true;
@@ -27,8 +35,32 @@ public sealed class Win32OverlayChrome : IOverlayChrome
         ArgumentNullException.ThrowIfNull(target);
         _target = target;
         _originalStyle = NativeMethods.GetWindowLong(target.Handle, NativeMethods.GwlExStyle);
+        DisableSystemRounding(target.Handle);
         return NativeMethods.IsWindow(target.Handle);
     }
+
+    /// <summary>
+    /// Puts the tool palette above every canvas. Being top-most is not enough on its own,
+    /// because the canvases are top-most too and are opened afterwards, so the palette is
+    /// ordered after them and has to be re-ordered whenever a canvas is rebuilt. The call
+    /// is idempotent for exactly that reason.
+    /// </summary>
+    public bool AttachCompanion(IOverlayWindowTarget target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+
+        var handle = target.Handle;
+        if (handle == IntPtr.Zero || !NativeMethods.IsWindow(handle))
+            return false;
+
+        _companion = target;
+        DisableSystemRounding(handle);
+
+        var flags = NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate;
+        return NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0, flags);
+    }
+
+    public void DetachCompanion() => _companion = null;
 
     public void Detach()
     {
@@ -100,5 +132,24 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             return null;
 
         return handle;
+    }
+
+    /// <summary>
+    /// Asks the window manager to leave the corners alone. Windows 11 gives a frameless
+    /// window a rounded pair of corners whether anyone asked for them or not, which is what
+    /// makes a palette that draws its own corners look lopsided; versions of Windows
+    /// without the preference answer with a failure, which is why nothing is made of it.
+    /// </summary>
+    private static void DisableSystemRounding(IntPtr handle)
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
+            return;
+
+        var preference = NativeMethods.DwmwcpDoNotRound;
+        _ = NativeMethods.DwmSetWindowAttribute(
+            handle,
+            NativeMethods.DwmwaWindowCornerPreference,
+            ref preference,
+            sizeof(int));
     }
 }

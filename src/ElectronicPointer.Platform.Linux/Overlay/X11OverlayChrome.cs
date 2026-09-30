@@ -44,6 +44,8 @@ public sealed class X11OverlayChrome : IOverlayChrome
 
     private nint _window;
 
+    private nint _companion;
+
     private int _width;
 
     private int _height;
@@ -77,6 +79,44 @@ public sealed class X11OverlayChrome : IOverlayChrome
 
         SendState(StateAdd, NetWmStateAbove);
         return true;
+    }
+
+    /// <summary>
+    /// The tool palette, asked to stay above the canvases. A window manager is free to
+    /// ignore an EWMH hint, so the request simply goes out; the palette is re-raised
+    /// whenever a canvas is rebuilt, because a manager that honours the hint honours it for
+    /// whichever window asked last.
+    /// </summary>
+    public bool AttachCompanion(IOverlayWindowTarget target)
+    {
+        if (!IsSupported || target is not { Handle: not 0 })
+            return false;
+
+        // The companion owns its own chrome instance, so it is the one that has to open the
+        // connection rather than borrow the canvas's.
+        if (!EnsureDisplay())
+            return false;
+
+        _companion = target.Handle;
+        SendState(StateAdd, NetWmStateAbove, _companion);
+        SendState(StateAdd, NetWmStateSkipTaskbar, _companion);
+        SendState(StateAdd, NetWmStateSkipPager, _companion);
+        return true;
+    }
+
+    public void DetachCompanion()
+    {
+        if (_companion == 0)
+            return;
+
+        if (_display != 0)
+        {
+            SendState(StateRemove, NetWmStateAbove, _companion);
+            SendState(StateRemove, NetWmStateSkipTaskbar, _companion);
+            SendState(StateRemove, NetWmStateSkipPager, _companion);
+        }
+
+        _companion = 0;
     }
 
     public void Detach()
@@ -213,9 +253,31 @@ public sealed class X11OverlayChrome : IOverlayChrome
         _height = (int)Math.Min(height, int.MaxValue);
     }
 
+    /// <summary>
+    /// Opens the connection this instance needs when it does not have one yet. A companion
+    /// is bound to a chrome of its own, so it cannot rely on a canvas having opened the
+    /// display first.
+    /// </summary>
+    private bool EnsureDisplay()
+    {
+        if (_display != 0)
+            return true;
+
+        if (!X11Runtime.EnsureThreadsInitialized())
+            return false;
+
+        _display = X11NativeMethods.XOpenDisplay(LinuxSession.DisplayName);
+        return _display != 0;
+    }
+
     private void SendState(nint action, string atomName)
     {
-        if (_display == 0 || _window == 0)
+        SendState(action, atomName, _window);
+    }
+
+    private void SendState(nint action, string atomName, nint window)
+    {
+        if (_display == 0 || window == 0)
             return;
 
         var messageType = X11NativeMethods.XInternAtom(_display, NetWmState, false);
@@ -226,7 +288,7 @@ public sealed class X11OverlayChrome : IOverlayChrome
         var message = new X11NativeMethods.XClientMessageEvent
         {
             Type = ClientMessage,
-            Window = _window,
+            Window = window,
             MessageType = messageType,
             Format = 32,
             Data0 = action,

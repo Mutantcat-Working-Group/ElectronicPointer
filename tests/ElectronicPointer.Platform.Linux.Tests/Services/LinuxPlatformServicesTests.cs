@@ -1,6 +1,7 @@
 using Mutantcat.ElectronicPointer.Core.Input;
 using Mutantcat.ElectronicPointer.Platform;
 using Mutantcat.ElectronicPointer.Platform.Input;
+using Mutantcat.ElectronicPointer.Platform.Overlay;
 using Xunit;
 
 namespace Mutantcat.ElectronicPointer.Platform.Linux.Tests.Services;
@@ -142,5 +143,44 @@ public class LinuxPlatformServicesTests
 
         services.Dispose();
         services.Dispose();
+    }
+
+    [Fact]
+    public void OverlayChrome_IsHandedOutPerWindow()
+    {
+        using var services = new LinuxPlatformServices();
+
+        // Every canvas owns its native window, so a shared chrome would have its target
+        // replaced by the next canvas and detached by whichever canvas closed first.
+        var first = services.CreateOverlayChrome();
+        var second = services.CreateOverlayChrome();
+
+        Assert.NotSame(first, second);
+        Assert.Equal(LinuxSession.IsX11, first.IsSupported);
+        Assert.Equal(LinuxSession.IsX11, second.IsSupported);
+    }
+
+    [Fact]
+    public void Companion_IsRefusedWhereNoCanvasCanBeHosted()
+    {
+        using var services = new LinuxPlatformServices();
+        var chrome = services.CreateOverlayChrome();
+
+        // A session that cannot host a canvas cannot host the palette that drives one
+        // either, and the answer has to be the same refusal rather than a half applied
+        // state on a window that was never bound. The supported path needs a live canvas
+        // in a real session, which is what a unit test cannot honestly provide.
+        if (chrome.IsSupported)
+            return;
+
+        Assert.False(chrome.AttachCompanion(new StubWindow(0x1000)));
+        chrome.DetachCompanion();
+    }
+
+    private sealed class StubWindow : IOverlayWindowTarget
+    {
+        public StubWindow(nint handle) => Handle = handle;
+
+        public nint Handle { get; }
     }
 }

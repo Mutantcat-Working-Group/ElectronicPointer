@@ -26,6 +26,16 @@ public interface IOverlayChrome
 
     void Detach();
 
+    /// <summary>
+    /// Binds to a window that travels with the overlay rather than being one of its
+    /// canvases: the tool palette. An overlay surface covers a whole display and floats
+    /// above ordinary windows, so a companion has to be lifted above the surfaces it
+    /// drives or its buttons end up buried under ink that eats the click.
+    /// </summary>
+    bool AttachCompanion(IOverlayWindowTarget target);
+
+    void DetachCompanion();
+
     bool SetClickThrough(bool enabled);
 
     bool SetAlwaysOnTop(bool enabled);

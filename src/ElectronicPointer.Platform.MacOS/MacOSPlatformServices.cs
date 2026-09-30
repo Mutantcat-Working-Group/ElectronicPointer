@@ -38,7 +38,6 @@ public sealed class MacOSPlatformServices : IPlatformServices
         PlatformFeature.HandwritingRecognition,
     };
 
-    private readonly MacOSOverlayChrome _overlay = new();
     private readonly MacOSGlobalHotkeyService _hotkeys = new();
     private readonly MacOSScreenCaptureService _capture = new();
     private readonly MacOSAutoStartService _autoStart = new();
@@ -54,7 +53,8 @@ public sealed class MacOSPlatformServices : IPlatformServices
 
     public string PlatformName => "macOS";
 
-    public IOverlayChrome Overlay => _overlay;
+    /// <summary>A chrome per window: each one holds the window it was attached to.</summary>
+    public IOverlayChrome CreateOverlayChrome() => new MacOSOverlayChrome();
 
     public IGlobalHotkeyService Hotkeys => _hotkeys;
 

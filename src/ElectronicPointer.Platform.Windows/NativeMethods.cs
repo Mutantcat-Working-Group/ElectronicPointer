@@ -36,6 +36,12 @@ internal static partial class NativeMethods
     public const uint ModWin = 0x0008;
     public const uint ModNoRepeat = 0x4000;
 
+    // DWMWA_WINDOW_CORNER_PREFERENCE and its values, for the window manager that rounds
+    // the corners of a frameless window whether the application asked for it or not.
+    public const int DwmwaWindowCornerPreference = 33;
+
+    public const int DwmwcpDoNotRound = 2;
+
     public const int SmXVirtualScreen = 76;
     public const int SmYVirtualScreen = 77;
     public const int CxVirtualScreen = 78;
@@ -115,6 +121,11 @@ internal static partial class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool IsWindow(IntPtr hwnd);
+
+    // The desktop window manager, which owns the rounded corners a frameless window is
+    // given from Windows 11 onwards.
+    [DllImport("dwmapi.dll", SetLastError = true)]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern ushort RegisterClass(ref WndClassW classAttributes);

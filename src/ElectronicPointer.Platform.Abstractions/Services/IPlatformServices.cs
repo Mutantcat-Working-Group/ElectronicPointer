@@ -19,7 +19,12 @@ public interface IPlatformServices : IDisposable
 
     string PlatformName { get; }
 
-    IOverlayChrome Overlay { get; }
+    /// <summary>
+    /// A fresh window chrome per overlay surface. Every chrome instance holds one native
+    /// window, and a desk has several canvases at once, so the platform hands them out
+    /// rather than sharing a single instance whose target the next canvas would overwrite.
+    /// </summary>
+    IOverlayChrome CreateOverlayChrome();
 
     IGlobalHotkeyService Hotkeys { get; }
 

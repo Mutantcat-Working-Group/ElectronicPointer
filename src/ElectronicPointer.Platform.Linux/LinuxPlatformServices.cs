@@ -45,7 +45,6 @@ public sealed class LinuxPlatformServices : IPlatformServices
         PlatformFeature.HandwritingRecognition,
     };
 
-    private readonly X11OverlayChrome _overlay = new();
     private readonly X11GlobalHotkeyService _hotkeys = new();
     private readonly X11ScreenCaptureService _capture = new();
     private readonly LinuxAutoStartService _autoStart = new();
@@ -68,7 +67,8 @@ public sealed class LinuxPlatformServices : IPlatformServices
         _ => "Linux (X11)",
     };
 
-    public IOverlayChrome Overlay => _overlay;
+    /// <summary>A chrome per window: each one holds the window it was attached to.</summary>
+    public IOverlayChrome CreateOverlayChrome() => new X11OverlayChrome();
 
     public IGlobalHotkeyService Hotkeys => _hotkeys;
 

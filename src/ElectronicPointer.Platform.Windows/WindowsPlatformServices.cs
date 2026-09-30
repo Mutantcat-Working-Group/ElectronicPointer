@@ -44,7 +44,6 @@ public sealed class WindowsPlatformServices : IPlatformServices
 
     private readonly Win32ScreenCaptureService _capture = new();
     private readonly Win32GlobalHotkeyService _hotkeys = new();
-    private readonly Win32OverlayChrome _overlay = new();
     private readonly Win32AutoStartService _autoStart = new();
     private readonly Win32PresentationBridge _presentation = new();
     private readonly BuiltInShapeRecognizer _recognizer = new();
@@ -58,7 +57,8 @@ public sealed class WindowsPlatformServices : IPlatformServices
 
     public string PlatformName => "Windows";
 
-    public IOverlayChrome Overlay => _overlay;
+    /// <summary>A chrome per window: each one holds the window it was attached to.</summary>
+    public IOverlayChrome CreateOverlayChrome() => new Win32OverlayChrome();
 
     public IGlobalHotkeyService Hotkeys => _hotkeys;
 

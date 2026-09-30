@@ -48,6 +48,9 @@ internal static partial class MacOSNativeMethods
     // NSWindow levels
     internal const nint WindowLevelFloating = 3;
 
+    /// <summary>NSStatusWindowLevel: above every overlay canvas, below the screen saver.</summary>
+    internal const nint WindowLevelStatus = 25;
+
     // NSWindow collection behaviour bits, ORed together in a single call.
     internal const nint CollectionBehaviorCanJoinAllSpaces = 1 << 0;
 

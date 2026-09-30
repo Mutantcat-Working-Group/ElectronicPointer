@@ -25,6 +25,12 @@ public sealed class UnsupportedOverlayChrome : IOverlayChrome
     {
     }
 
+    public bool AttachCompanion(IOverlayWindowTarget target) => false;
+
+    public void DetachCompanion()
+    {
+    }
+
     public bool SetClickThrough(bool enabled) => false;
 
     public bool SetAlwaysOnTop(bool enabled) => false;
@@ -126,7 +132,7 @@ public sealed class UnsupportedPlatformServices : IPlatformServices
 
     public string PlatformName { get; }
 
-    public IOverlayChrome Overlay { get; } = new UnsupportedOverlayChrome();
+    public IOverlayChrome CreateOverlayChrome() => new UnsupportedOverlayChrome();
 
     public IGlobalHotkeyService Hotkeys { get; } = new UnsupportedGlobalHotkeyService();
 

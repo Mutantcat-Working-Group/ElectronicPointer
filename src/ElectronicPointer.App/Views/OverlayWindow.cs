@@ -64,7 +64,10 @@ public sealed class OverlayWindow : Window
     /// </summary>
     public void AttachChrome(IPlatformServices platform, BoardSession session)
     {
-        _chrome = platform.Overlay;
+        // One chrome per surface: a shared instance would have its native window replaced
+        // by the next canvas, and the canvas that closed first would then detach a window
+        // it never belonged to.
+        _chrome = platform.CreateOverlayChrome();
         if (TryGetPlatformHandle() is not { } handle)
             return;
 

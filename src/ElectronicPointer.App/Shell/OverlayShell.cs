@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -92,7 +93,49 @@ public sealed class OverlayShell : IDisposable
         BuildOverlays();
         RegisterHotkeys();
         Platform.Presentation.Start();
+
+        WarnWhenShortcutsCannotFire();
     }
+
+    /// <summary>
+    /// macOS gates a passive event tap behind the Accessibility permission, and the tap is
+    /// still created without it: it simply never receives an event. Every gesture the user
+    /// presses would then do nothing, so the one thing that can explain it is said in the
+    /// palette's status line rather than in a dialog nobody can dismiss while the desk is
+    /// covered in ink.
+    /// </summary>
+    private void WarnWhenShortcutsCannotFire()
+    {
+        if (!OperatingSystem.IsMacOS())
+            return;
+
+        if (Platform.Hotkeys is not MacOSGlobalHotkeyService macos || !macos.RequiresAccessibilityPermission)
+            return;
+
+        // The tap runs on its own run loop thread, so it is given a moment to come up
+        // before the answer is believed.
+        var grace = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        grace.Tick += (_, _) =>
+        {
+            grace.Stop();
+
+            // The guard is repeated inside the tick because a lambda is analysed on its
+            // own, without the answer the method above already reached.
+            if (_shuttingDown || _disposed || !OperatingSystem.IsMacOS() || !ShortcutsAreLive(macos))
+                return;
+
+            _toolbar?.ShowStatus("快捷键未生效：请到 系统设置 > 隐私与安全性 > 辅助功能 中为电子教鞭授权。");
+        };
+
+        grace.Start();
+    }
+
+    /// <summary>
+    /// Whether the event tap is up. Reading it is a macOS only act, and the analyzer is
+    /// told so here rather than at every place that asks.
+    /// </summary>
+    [SupportedOSPlatform("macos")]
+    private static bool ShortcutsAreLive(MacOSGlobalHotkeyService macos) => macos.IsTapEnabled;
 
     /// <summary>
     /// One canvas per display, built from what the host reports right now. The board itself
@@ -117,6 +160,11 @@ public sealed class OverlayShell : IDisposable
         }
 
         MainWindow = _overlays.Count > 0 ? _overlays[0] : _toolbar!;
+
+        // Every canvas above asked to be on top of whatever it was ordered after, so the
+        // palette has to be lifted once more now that all of them exist: left alone it
+        // would sit under the first canvas it used to cover.
+        _toolbar?.LiftAboveOverlays();
 
         // The lifetime keeps its own reference to the main window, and it has to follow the
         // new surface. A lifetime still holding a window that was closed is how an app
@@ -199,32 +247,14 @@ public sealed class OverlayShell : IDisposable
 
         foreach (var (hotkey, _) in DefaultHotkeys.All)
         {
-            var mapped = MapHotkey(hotkey);
+            // Control on macOS means Command, so the shared table is translated on the way
+            // in rather than being written twice.
+            var mapped = hotkey.OnThisPlatform();
             if (Platform.Hotkeys.Register(mapped))
                 _bindings.Add((mapped, ActionFor(hotkey)));
         }
 
         Platform.Hotkeys.Pressed += OnHotkeyPressed;
-    }
-
-    /// <summary>
-    /// Control on macOS means Command. The shared binding table was written for Windows,
-    /// and a Mac user's fingers already expect Cmd+Z to undo and Cmd+Q to quit, so the
-    /// translation happens here and every platform keeps a single set of gestures.
-    /// </summary>
-    private static Hotkey MapHotkey(Hotkey hotkey)
-    {
-        if (!OperatingSystem.IsMacOS())
-            return hotkey;
-
-        var modifiers = hotkey.Modifiers;
-        if ((modifiers & HotkeyModifiers.Control) != 0)
-        {
-            modifiers &= ~HotkeyModifiers.Control;
-            modifiers |= HotkeyModifiers.Command;
-        }
-
-        return new Hotkey(modifiers, hotkey.Key);
     }
 
     private Action ActionFor(Hotkey hotkey)
@@ -296,7 +326,13 @@ public sealed class OverlayShell : IDisposable
     {
         Session.ToolbarVisible = !Session.ToolbarVisible;
         if (_toolbar is not null)
+        {
             _toolbar.IsVisible = Session.ToolbarVisible;
+            // Coming back from hidden, the palette has to be above the canvases again: a
+            // window manager is free to reorder whatever it hid.
+            if (Session.ToolbarVisible)
+                _toolbar.LiftAboveOverlays();
+        }
     }
 
     /// <summary>

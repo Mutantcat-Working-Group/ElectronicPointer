@@ -30,6 +30,20 @@ public readonly record struct Hotkey(HotkeyModifiers Modifiers, KeyCode Key)
         }
     }
 
+    /// <summary>
+    /// The gesture as the running host actually executes it: Control becomes Command on
+    /// macOS. Hints built from the raw struct would otherwise promise a Ctrl+Q a Mac user
+    /// can never press, so the shell registers and the toolbar shows what this returns.
+    /// </summary>
+    public Hotkey OnThisPlatform()
+    {
+        if (!OperatingSystem.IsMacOS() || (Modifiers & HotkeyModifiers.Control) == 0)
+            return this;
+
+        var modifiers = (Modifiers & ~HotkeyModifiers.Control) | HotkeyModifiers.Command;
+        return new Hotkey(modifiers, Key);
+    }
+
     public string Text
     {
         get
