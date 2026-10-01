@@ -37,7 +37,7 @@ ElectronicPointer · 跨平台桌面电子教鞭与批注 · [English](./README.
 
 - 穿透开关 `Ctrl+Alt+T`：开启后鼠标事件落到桌面的原应用上，关闭后才能书写。
 - 画布始终置顶，可从任务栏、Dock 与窗口切换器中隐藏。
-- 全局快捷键共 13 条，macOS 上 `Ctrl` 自动映射为 `Cmd`。
+- 全局快捷键共 14 条，macOS 上 `Ctrl` 自动映射为 `Cmd`。
 - 多显示器按屏幕定位画布；进入全屏放映时自动进入穿透。
 - 设置窗口提供登录自启开关、批注文档的打开与保存、以及把当前页导出为图片。
 
@@ -90,7 +90,7 @@ ElectronicPointer · 跨平台桌面电子教鞭与批注 · [English](./README.
 
 - [X] 跨平台主体：Core、Rendering、Platform.Abstractions、Platform.Windows、Platform.MacOS、Platform.Linux、App
 - [X] 工具栏七组：工具、墨色、粗细、页面、编辑、画板、文件
-- [X] 全局快捷键 13 条，macOS Ctrl 折成 Cmd
+- [X] 全局快捷键 14 条，macOS Ctrl 折成 Cmd
 - [X] 多页画板、撤销重做、套索选择与移动
 - [X] `.epboard` 文档读写与图片导出
 - [X] 冻结屏幕与墨迹识别入口

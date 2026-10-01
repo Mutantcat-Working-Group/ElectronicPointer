@@ -108,7 +108,33 @@ public sealed class OverlayShell : IDisposable
         RegisterHotkeys();
         Platform.Presentation.Start();
 
+        HintHowToHandTheDeskBack();
         WarnWhenShortcutsCannotFire();
+    }
+
+    /// <summary>
+    /// The one moment the palette has something to say that is not a response to a press.
+    /// A first run starts in the hand the user left the pen in, and on a first run that hand
+    /// is the pen: every click on the desk is ink, and nothing on screen says how to give
+    /// the desktop its clicks back. That question has been asked of this app more than any
+    /// other, and the answer lives in the pass-through switch's tooltip, which a user who
+    /// does not know what the switch is for has no reason to hover.
+    /// </summary>
+    private void HintHowToHandTheDeskBack()
+    {
+        // Inherited settings are a user who already knows, and a desk that is already
+        // clickable needs no invitation to click it.
+        if (_configuration.WasLoaded || Session.PassThrough)
+            return;
+
+        // The status line says one thing at a time. A gesture the host refused is the more
+        // urgent sentence, so the hint yields to it and the refusal keeps its permanent
+        // home in the settings' capability row.
+        if (_refusedHotkeys.Count > 0)
+            return;
+
+        var gesture = DefaultHotkeys.TogglePassThrough.OnThisPlatform().Text;
+        _toolbar?.ShowStatus($"左键即可书写；按 {gesture} 可把点击还给桌面。");
     }
 
     /// <summary>

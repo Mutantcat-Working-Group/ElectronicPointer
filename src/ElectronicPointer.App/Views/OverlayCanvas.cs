@@ -34,6 +34,15 @@ public sealed class OverlayCanvas : Control
     private WriteableBitmap? _fallbackSurface;
     private SKBitmap? _fallbackTarget;
     private PixelSize _fallbackSize;
+    // One frame of pixels, kept for the size it was made for. A desk sized frame is well
+    // past the large object threshold, and this canvas redraws for every pointer move,
+    // so a fresh array per redraw would put the collector to work at pen speed.
+    private byte[]? _frameBuffer;
+    // Two cursors, made once. The cursor is re-read on every redraw, and a cursor built
+    // per redraw is one object and, on hosts that reload the cursor when it is assigned,
+    // one reload, for every move of the pointer.
+    private Cursor? _hoverCursor;
+    private Cursor? _drawCursor;
 
     public BoardSession? Session { get; private set; }
 
@@ -67,6 +76,7 @@ public sealed class OverlayCanvas : Control
         _fallbackTarget?.Dispose();
         _fallbackTarget = null;
         _fallbackSurface = null;
+        _frameBuffer = null;
     }
 
     /// <summary>Surface-local point in board coordinates.</summary>
@@ -169,6 +179,7 @@ public sealed class OverlayCanvas : Control
                 new Vector(96, 96),
                 PixelFormat.Bgra8888,
                 AlphaFormat.Premul);
+            _frameBuffer = new byte[_fallbackTarget.RowBytes * height];
             _fallbackSize = size;
         }
 
@@ -178,7 +189,7 @@ public sealed class OverlayCanvas : Control
             DrawGesture(canvas, session, scaling);
         }
 
-        var pixels = new byte[_fallbackTarget!.RowBytes * height];
+        var pixels = _frameBuffer!;
         Marshal.Copy(_fallbackTarget.GetPixels(), pixels, 0, pixels.Length);
 
         using var locked = _fallbackSurface!.Lock();
@@ -253,14 +264,16 @@ public sealed class OverlayCanvas : Control
         if (session is null)
             return;
 
-        Cursor = session.PassThrough
-            ? new Cursor(StandardCursorType.Arrow)
-            : session.Tool switch
-            {
-                ToolKind.Pen => new Cursor(StandardCursorType.Cross),
-                ToolKind.Highlighter => new Cursor(StandardCursorType.Cross),
-                ToolKind.Eraser => new Cursor(StandardCursorType.Cross),
-                _ => new Cursor(StandardCursorType.Arrow),
-            };
+        _hoverCursor ??= new Cursor(StandardCursorType.Arrow);
+        _drawCursor ??= new Cursor(StandardCursorType.Cross);
+
+        // Select has to reach the ink instead of drawing on it, and a desk in pass-through
+        // has to stay clickable, so both sit under the arrow.
+        var cursor = session.PassThrough || session.Tool == ToolKind.Select ? _hoverCursor : _drawCursor;
+
+        // Assigned only on a real change: the same object handed over again would still
+        // send the host a cursor it already has, once per pointer move.
+        if (!ReferenceEquals(Cursor, cursor))
+            Cursor = cursor;
     }
 }

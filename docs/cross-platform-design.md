@@ -65,7 +65,7 @@ App 侧的 `AvaloniaHandle` 在 `OverlayWindow.AttachChrome` 里从 `TopLevel.Tr
 
 指针一律建模成 begin / move / end 三段（`BoardSession.PointerPressed/Moved/Released`），压力从 `PointerPoint.Properties.Pressure` 取。Apple Pencil、数位板、手指和鼠标走同一条路，所以「笔锋」在三个系统上由同一套采样逻辑算出，只是压感的来源不同。
 
-快捷键表 `DefaultHotkeys` 的 13 条手势写在 Core，全平台一致。只有一处平台化改写：macOS 上 Ctrl 折叠成 Command（`OverlayShell.MapHotkey`），因为 Mac 用户的手已经习惯 Cmd+Z 撤销、Cmd+Q 退出。热键事件来自 AppKit 或 X11 的后台线程，统一经 `Dispatcher.UIThread.Post` 回到 UI 线程。
+快捷键表 `DefaultHotkeys` 的 14 条手势写在 Core，全平台一致。只有一处平台化改写：macOS 上 Ctrl 折叠成 Command（`OverlayShell.MapHotkey`），因为 Mac 用户的手已经习惯 Cmd+Z 撤销、Cmd+Q 退出。热键事件来自 AppKit 或 X11 的后台线程，统一经 `Dispatcher.UIThread.Post` 回到 UI 线程。
 
 ### 3. 做法一致：由 Platform 层吸收的部分
 

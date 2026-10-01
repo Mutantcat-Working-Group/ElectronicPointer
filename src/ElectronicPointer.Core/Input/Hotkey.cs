@@ -184,6 +184,11 @@ public static class DefaultHotkeys
         (TogglePassThrough, "切换穿透模式"),
         (Undo, "撤销"),
         (Redo, "重做"),
+        // The fallback every other desk program answers to. It was already wired up in the
+        // shell's action table but never listed here, so it was registered by nothing and
+        // the branch could not be reached: a user pressing Ctrl+Y got the desktop's redo,
+        // or nothing, with no way to learn that this app had meant to answer.
+        (RedoAlternate, "备用重做"),
         (ClearPage, "清空当前页"),
         (NewPage, "新建页面"),
         (NextPage, "下一页"),

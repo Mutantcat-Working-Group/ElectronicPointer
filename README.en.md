@@ -37,7 +37,7 @@ Core values:
 
 - Click-through toggle `Ctrl+Alt+T`: when on, mouse events reach the application behind the canvas; when off, you write.
 - The canvas stays on top and can be hidden from the task bar, the Dock and the window switcher.
-- Thirteen global shortcuts, with `Ctrl` folded to `Cmd` on macOS.
+- Fourteen global shortcuts, with `Ctrl` folded to `Cmd` on macOS.
 - Per-display placement across multiple monitors, and automatic click-through when a full screen slideshow is detected.
 - The settings window offers launch at login, open/save for board documents, and exporting the current page as an image.
 
@@ -90,7 +90,7 @@ Grab your platform from [Releases](https://github.com/Mutantcat-Working-Group/El
 
 - [X] Cross-platform core: Core, Rendering, Platform.Abstractions, Platform.Windows, Platform.MacOS, Platform.Linux, App
 - [X] Toolbar groups: tools, ink, thickness, pages, editing, board, files
-- [X] Thirteen global shortcuts, with Ctrl folded to Cmd on macOS
+- [X] Fourteen global shortcuts, with Ctrl folded to Cmd on macOS
 - [X] Multi-page boards, undo/redo, lasso select and move
 - [X] `.epboard` read/write and image export
 - [X] Freeze screen and the ink recognition entry point

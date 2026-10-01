@@ -22,6 +22,14 @@ public sealed class AppConfiguration
     [JsonIgnore]
     public string Path { get; private set; } = string.Empty;
 
+    /// <summary>
+    /// Whether a file was there to read. A first run has nothing to inherit, which is the
+    /// one moment the app can afford to explain itself before the user has learned where
+    /// anything is, and the only moment where an unsaved setting is not a lost one.
+    /// </summary>
+    [JsonIgnore]
+    public bool WasLoaded { get; private set; }
+
     public ToolKind Tool { get; set; } = ToolKind.Pen;
 
     public uint Color { get; set; } = InkPalette.Colors[0];
@@ -62,6 +70,7 @@ public sealed class AppConfiguration
                 return configuration;
 
             loaded.Path = path;
+            loaded.WasLoaded = true;
             return Sanitize(loaded);
         }
         catch (JsonException)
