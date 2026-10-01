@@ -29,7 +29,12 @@ public sealed class Win32ScreenCaptureService : IScreenCaptureService
         var entry = _displays.FirstOrDefault(candidate =>
             candidate.Name == display.Name || candidate.Index == display.Index);
 
-        return entry is null ? null : Capture(entry);
+        // The private one, not this one. The public method used to end by calling itself
+        // with the display it had just found, and the lookup then matched that same
+        // display again on every pass: pressing "freeze screen" walked the stack down
+        // until the runtime gave up, which is a failure no caller can catch, try, or log
+        // its way out of. Reach for the grab by the name it was given.
+        return entry is null ? null : CaptureDisplay(entry);
     }
 
     /// <summary>Grabs the desktop behind the overlay, or returns null when it refused.</summary>
