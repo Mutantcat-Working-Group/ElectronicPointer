@@ -18,7 +18,10 @@ namespace Mutantcat.ElectronicPointer.Platform.Windows;
 ///
 /// Windows 11 rounds the corners of every frameless window on its own, while the palette
 /// draws an eight pixel radius of its own. The two cannot both win, so the system's
-/// rounding is switched off on both windows and the application's stays the only one.
+/// rounding is switched off on both windows and the application's stays the only one. The
+/// switch is followed by a frame change whenever one of these calls moves or re-styles the
+/// window, and a frame change makes the window manager settle the shape again, so the
+/// preference is handed over after the change as well as before it.
 /// </summary>
 public sealed class Win32OverlayChrome : IOverlayChrome
 {
@@ -59,10 +62,15 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             return false;
 
         _companion = target;
-        DisableSystemRounding(handle);
 
         var flags = NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate;
-        return NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0, flags);
+        var lifted = NativeMethods.SetWindowPos(handle, NativeMethods.HwndTopmost, 0, 0, 0, 0, flags);
+        // After the lift rather than before it. Changing the z-order of a window the
+        // window manager is already composing makes it redraw the frame, and a redrawn frame
+        // re-settles which corners are round, so a preference handed over first is the one
+        // that gets answered with instead of the one that gets carried out.
+        DisableSystemRounding(handle);
+        return lifted;
     }
 
     public void DetachCompanion() => _companion = null;
@@ -95,7 +103,9 @@ public sealed class Win32OverlayChrome : IOverlayChrome
 
         var flags = NativeMethods.SwpNoMove | NativeMethods.SwpNoSize | NativeMethods.SwpNoActivate;
         var insertAfter = enabled ? NativeMethods.HwndTopmost : NativeMethods.HwndNoTopmost;
-        return NativeMethods.SetWindowPos(target.Value, insertAfter, 0, 0, 0, 0, flags);
+        var ordered = NativeMethods.SetWindowPos(target.Value, insertAfter, 0, 0, 0, 0, flags);
+        DisableSystemRounding(target.Value);
+        return ordered;
     }
 
     public bool SetHiddenFromSwitcher(bool hidden) => Toggle(NativeMethods.WsExToolWindow, hidden);
@@ -118,7 +128,12 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             return true;
 
         NativeMethods.SetWindowLong(target.Value, NativeMethods.GwlExStyle, updated);
-        return ApplyStyles(SetWindowPosFrameChanged);
+        var styled = ApplyStyles(SetWindowPosFrameChanged);
+        // The style change redraws the frame, which re-settles the corner shape, and the
+        // canvas reaches this path from the same opening that switched the rounding off in
+        // the first place: click-through and hiding from the switcher both land after it.
+        DisableSystemRounding(target.Value);
+        return styled;
     }
 
     private bool ApplyStyles(uint flags)
