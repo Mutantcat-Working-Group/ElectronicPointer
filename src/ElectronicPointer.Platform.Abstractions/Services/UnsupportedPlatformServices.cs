@@ -31,6 +31,8 @@ public sealed class UnsupportedOverlayChrome : IOverlayChrome
     {
     }
 
+    public bool ReassertCompanionShape() => false;
+
     public bool SetClickThrough(bool enabled) => false;
 
     public bool SetAlwaysOnTop(bool enabled) => false;

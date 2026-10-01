@@ -87,6 +87,25 @@ public sealed class Win32OverlayChrome : IOverlayChrome
 
     public void DetachCompanion() => _companion = null;
 
+    /// <summary>
+    /// Hands the bound companion the same keep-the-hands-off preference the lift already
+    /// gave it, with no z-order change this time. A window the host is composing has its
+    /// corner shape settled again whenever it is moved into place or activated, and each of
+    /// those settles which corners are round: a companion that arrived with the preference
+    /// and was then shifted to its final place is otherwise left with a corner of the host's
+    /// over the one it drew itself. Reports whether a live companion was there to be asked;
+    /// a version of Windows without the preference answers with a failure nothing is made of.
+    /// </summary>
+    public bool ReassertCompanionShape()
+    {
+        var handle = _companion?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero || !NativeMethods.IsWindow(handle))
+            return false;
+
+        DisableSystemRounding(handle);
+        return true;
+    }
+
     public void Detach()
     {
         if (_target is not null && _target.Handle != IntPtr.Zero && NativeMethods.IsWindow(_target.Handle))

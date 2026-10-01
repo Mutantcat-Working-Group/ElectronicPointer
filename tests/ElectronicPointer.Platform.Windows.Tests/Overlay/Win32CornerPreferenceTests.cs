@@ -32,4 +32,20 @@ public sealed class Win32CornerPreferenceTests
         Assert.NotEqual(NativeMethods.DwmwcpDoNotRound, NativeMethods.DwmwcpRoundSmall);
         Assert.NotEqual(NativeMethods.DwmwcpDoNotRound, NativeMethods.DwmwcpRound);
     }
+
+    [Fact]
+    public void ReassertingTheShapeWithNoCompanionSaysItDidNothing()
+    {
+        // No companion is bound yet, so there is no handle for the preference to land on.
+        // Re-asserting has to report that it did nothing rather than hand an asking to a
+        // zero handle: the guard that repeats the asking runs before the lift on the opening
+        // frame just as it runs after every later move, activation and composition.
+        var chrome = new Win32OverlayChrome();
+        Assert.False(chrome.ReassertCompanionShape());
+
+        // The same answer after a detach: the companion the chrome used to hold is gone, so
+        // there is nothing left to hand the preference to and nothing to pretend otherwise.
+        chrome.DetachCompanion();
+        Assert.False(chrome.ReassertCompanionShape());
+    }
 }

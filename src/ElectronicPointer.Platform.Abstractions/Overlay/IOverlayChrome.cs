@@ -57,6 +57,18 @@ public interface IOverlayChrome
     bool SetAlwaysOnTop(bool enabled);
 
     bool SetHiddenFromSwitcher(bool hidden);
+
+    /// <summary>
+    /// Hands the keep-the-hands-off corner preference to a bound companion once more, without
+    /// re-issuing the lift. A host that settles a frameless window's shape on every
+    /// composition settles it again after the window is moved to its final place, is
+    /// activated, or finishes its opening layout, and each of those would answer a
+    /// preference handed over only at the resize with a corner of its own, which leaves a
+    /// card that drew its radius on all four corners with three of the host's and one of its
+    /// own. Reports whether a bound companion was there to be asked, so a host that never
+    /// rounds a frameless window says so instead of pretending otherwise.
+    /// </summary>
+    bool ReassertCompanionShape();
 }
 
 /// <summary>

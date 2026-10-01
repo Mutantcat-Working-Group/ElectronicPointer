@@ -128,6 +128,11 @@ public sealed class ToolbarWindow : Window
         // settles the corners a second time. OnOpened is where the z-order lives, and the
         // resizes keep the corner shape from being left to the host on their own.
         this.KeepChromeCurrent(LiftAboveOverlays);
+
+        // The palette is shifted into place after it opens and is composed again each time it
+        // is, so the host is asked to keep its hands off the corners at those moments too,
+        // exactly where the resizes above already do it.
+        _companion.GuardAgainstLateCornerRounding(this);
         Refresh();
     }
 

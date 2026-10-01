@@ -110,6 +110,14 @@ public sealed class MacOSOverlayChrome : IOverlayChrome
         _companion = 0;
     }
 
+    /// <summary>
+    /// Nothing to do. AppKit does not round a frameless, transparent window on its own the
+    /// way a newer Windows does, so a companion card that drew its radius on all four
+    /// corners keeps exactly that after the window is moved or activated, and there is no
+    /// host preference to hand over again. Reports that it did nothing, which is the truth.
+    /// </summary>
+    public bool ReassertCompanionShape() => false;
+
     public void Detach()
     {
         if (_window == 0)

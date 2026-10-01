@@ -188,6 +188,11 @@ public sealed class SettingsWindow : Window
         // the host settles the corner shape once per frame change, and a handover that
         // arrives earlier than that is answered with rather than carried out.
         this.KeepChromeCurrent(LiftAboveOverlays);
+
+        // The dialog can be dragged by its header, is activated as the key window, and is
+        // composed again as it settles, so it asks the host to keep its hands off the corners
+        // at those moments as well, the same way the palette does.
+        _companion.GuardAgainstLateCornerRounding(this);
     }
 
     private readonly StackPanel _footerHost;

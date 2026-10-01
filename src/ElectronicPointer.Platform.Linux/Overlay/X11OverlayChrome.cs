@@ -131,6 +131,15 @@ public sealed class X11OverlayChrome : IOverlayChrome
         }
     }
 
+    /// <summary>
+    /// Nothing to do. A window manager decorates a framed window according to its own theme
+    /// but leaves a frameless one to the client entirely, and a companion here is a
+    /// transparent window whose whole visible shape is the card drawn inside it. There is no
+    /// rounding preference to hand over again after a move or an activation, so this reports
+    /// that it did nothing.
+    /// </summary>
+    public bool ReassertCompanionShape() => false;
+
     public void Detach()
     {
         if (_display == 0)

@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Mutantcat.ElectronicPointer.Platform.Overlay;
 using Mutantcat.ElectronicPointer.Platform.Services;
 
@@ -55,5 +56,56 @@ internal sealed class OverlayCompanion
 
         _chrome.DetachCompanion();
         _chrome = null;
+    }
+
+    /// <summary>
+    /// Hands the keep-the-hands-off corner preference to a bound companion again, without
+    /// re-issuing the lift. Safe whether or not a companion is bound yet: the host answers
+    /// the lift and the asking as two separate requests, so the guard below runs before the
+    /// lift on the opening frame exactly as it runs after it.
+    /// </summary>
+    public void ReassertShape() => _chrome?.ReassertCompanionShape();
+
+    /// <summary>
+    /// Follows a freshly opened companion through the moments the host settles the corner
+    /// shape again and asks it once more to keep its hands off. A host that decides a
+    /// frameless window's shape every time it composes one decides it again when the window
+    /// is moved to its final place, when it is activated, and once more when the final
+    /// composition of the opening frame settles; a preference handed over only at the resize
+    /// is answered with by each of those, which is what leaves a card that drew an eight
+    /// pixel radius on all four corners wearing three corners of the host's instead. The
+    /// preference is re-asserted at each of those moments and on a short one-shot timer that
+    /// rides out the composition no event announces, and the timer stops itself so a
+    /// long-lived window carries no timer and one closed an instant later leaves nothing
+    /// running.
+    /// </summary>
+    public void GuardAgainstLateCornerRounding(Window window)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+
+        ReassertShape();
+
+        // Deliberately never unsubscribed. These events belong to the companion window
+        // itself, which holds this object in a field for exactly as long as it is open, so
+        // there is nothing to leak: a move or an activation that settles the corners again
+        // happens on any later frame, not only the opening one.
+        window.PositionChanged += (_, _) => ReassertShape();
+        window.Activated += (_, _) => ReassertShape();
+        window.Deactivated += (_, _) => ReassertShape();
+
+        var beats = 0;
+        var settle = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        settle.Tick += (_, _) =>
+        {
+            ReassertShape();
+
+            // Roughly a second and a half of beats: long enough to ride out the host's
+            // asynchronous final composition of the opening frame, short enough that a
+            // window is not followed for the rest of the session.
+            if (++beats >= 12)
+                settle.Stop();
+        };
+
+        settle.Start();
     }
 }
