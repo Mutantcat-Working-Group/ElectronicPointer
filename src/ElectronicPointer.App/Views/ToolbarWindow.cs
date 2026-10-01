@@ -86,12 +86,12 @@ public sealed class ToolbarWindow : Window
         RequestedThemeVariant = ThemeVariant.Light;
         // The palette's shape is the card below and nothing else: a window that paints its
         // own opaque background puts a square sheet under the card's rounded corners, and
-        // whatever the window manager then does to a frameless window (Windows 11 rounds
-        // them on its own, older systems do not) lands on top of what the application drew,
-        // so no two corners end up agreeing. Letting the window stay transparent hands all
-        // four corners to the card, which is the same thing the ink canvas does, and the
-        // radius the card draws is handed to the host as well so it can cut the window to
-        // match instead of deciding the shape for itself.
+        // whatever the window manager then does to a frameless window, such as Windows 11
+        // rounding one on its own while older systems leave it alone, lands on top of what
+        // application drew, so no two corners end up agreeing. Letting the window stay
+        // transparent hands all four corners to the card, which is the same thing the ink
+        // canvas does, and the platform layer asks the host to keep its hands off that
+        // shape rather than cutting the window to it.
         Background = Brushes.Transparent;
         TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
 

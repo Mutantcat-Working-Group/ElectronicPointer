@@ -61,19 +61,18 @@ public interface IOverlayChrome
 
 /// <summary>
 /// The shape a companion window draws around itself, in the layout units the window is
-/// built in. A host that decides the corners of a frameless window on its own cannot be
-/// argued with by drawing: a native handle answers no question about what the
-/// application painted inside it, so the only way to stop a host from rounding a corner
-/// the application drew square, or squaring one it drew round, is to tell the host the
-/// radius and let it cut the same window the application drew.
+/// built in. A rounded card over a transparent window is the whole shape, which is why it
+/// looks the same on every platform: there is no native frame under it to disagree with
+/// and no host that is asked to cut anything. A host that rounds a frameless window of
+/// its own accord is asked to keep its hands off instead, because a corner the
+/// application drew itself has no second opinion to reconcile.
 /// </summary>
 public static class CompanionShape
 {
     /// <summary>
     /// The radius every companion window draws on all four of its corners. The card and
-    /// the host are cut from this one number so the two cannot drift apart: a radius that
-    /// appears in the card and not here leaves a corner the host cut to a shape the
-    /// application never drew.
+    /// the window itself are settled from this one number so the two cannot drift apart: a
+    /// radius that appears in one companion and not another leaves windows that disagree.
     /// </summary>
     public const int CornerRadius = 8;
 }

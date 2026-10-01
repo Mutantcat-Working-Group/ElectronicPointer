@@ -1,5 +1,4 @@
 using Mutantcat.ElectronicPointer.Platform.Overlay;
-using System.Runtime.InteropServices;
 using System.ComponentModel;
 
 namespace Mutantcat.ElectronicPointer.Platform.Windows;
@@ -17,24 +16,21 @@ namespace Mutantcat.ElectronicPointer.Platform.Windows;
 /// is ordered after every canvas, so a palette that opened first is not buried under the
 /// ink it drives.
 ///
-/// Windows 11 settles the corners of a frameless window on its own schedule. It rounds a
-/// window whether anyone asked, answers an asking late, and settles the shape again on
-/// every re-composition that follows, which is how a palette that draws an eight pixel
-/// radius of its own ends up with corners that disagree with each other. A companion is
-/// therefore asked for the host's own small radius, which lands inside the corner the
-/// card has already left transparent, so the hand the host has in it and the one the card
-/// draws say the same thing rather than two different ones.
+/// Windows 11 rounds the corners of a frameless window whether anyone asked for them,
+/// while every companion draws a radius of its own on all four corners. The two cannot
+/// both win, so the host is asked to keep its hands off that shape and nothing else is
+/// given a say in it: a rounded card over a transparent window is the whole window, the
+/// same as the ink canvas, and it is the one shape that stays identical on every platform
+/// and every version of Windows. Windows 10 has no preference to answer with and never
+/// rounds a frameless window in the first place, so the asking is a no-op there rather
+/// than a difference.
 ///
-/// A preference is still only a preference, and a host that answers one on its own
-/// schedule is how a palette ends up with corners that disagree with each other. A
-/// companion is therefore also cut to the shape its card draws, which is the one
-/// instruction about a window's corners that is carried out rather than answered.
+/// The asking is handed over again after every frame change, since a frame change makes
+/// the window manager settle the corner shape from scratch and a preference given before
+/// one is the one that gets answered with.
 /// </summary>
 public sealed class Win32OverlayChrome : IOverlayChrome
 {
-    // Either corner preference is handed over again after a frame change, since a frame
-    // change makes the window manager settle the corner shape from scratch and a
-    // preference given before one is the one that gets answered with.
     private IOverlayWindowTarget? _target;
 
     private IOverlayWindowTarget? _companion;
@@ -49,8 +45,9 @@ public sealed class Win32OverlayChrome : IOverlayChrome
         _target = target;
         _originalStyle = NativeMethods.GetWindowLong(target.Handle, NativeMethods.GwlExStyle);
         // The canvas covers a whole display edge to edge, so a host rounding it would eat
-        // a corner of ink that belongs there. It is the companion that wants a host's
-        // radius, because a companion draws a radius of its own.
+        // a corner of ink that belongs there. A companion draws a radius of its own on
+        // all four corners over a transparent window, which is a shape a host rounding the
+        // window would eat just the same.
         DisableSystemRounding(target.Handle);
         return NativeMethods.IsWindow(target.Handle);
     }
@@ -81,11 +78,10 @@ public sealed class Win32OverlayChrome : IOverlayChrome
         // After the lift rather than before it. Changing the z-order of a window the
         // window manager is already composing makes it redraw the frame, and a redrawn frame
         // re-settles which corners are round, so a preference handed over first is the one
-        // that gets answered with instead of the one that gets carried out.
-        AskForSmallRounding(handle);
-        // The preference asks the host for the corner it already has; the cut puts the
-        // shape in place whatever the host made of that asking.
-        RoundWindowShape(handle);
+        // that gets answered with instead of the one that gets carried out. The companion
+        // draws its own radius on all four corners the same way the canvas has none, so
+        // the asking here is the host's hands off rather than a corner of the host's.
+        DisableSystemRounding(handle);
         return lifted;
     }
 
@@ -171,16 +167,13 @@ public sealed class Win32OverlayChrome : IOverlayChrome
     }
 
     /// <summary>
-    /// Asks the window manager to leave the corners alone. Windows 11 gives a frameless
-    /// window a rounded pair of corners whether anyone asked for them or not, which is what
-    /// makes a palette that draws its own corners look lopsided; versions of Windows
-    /// without the preference answer with a failure, which is why nothing is made of it.
-    /// </summary>
-    /// <summary>
-    /// Asks the host to leave the corners alone. Only the canvas is asked this: it covers a
-    /// whole display edge to edge, so a host rounding it would eat a corner of ink that
-    /// belongs there. Versions of Windows without the preference answer with a failure,
-    /// which is why nothing is made of the answer.
+    /// Asks the host to leave the corners alone. Windows 11 gives a frameless window a
+    /// rounded pair of corners whether anyone asked for them or not, while the window
+    /// behind a companion is a rounded card over nothing at all: the canvas covers a whole
+    /// display edge to edge, so a host rounding it would eat a corner of ink that belongs
+    /// there, and a companion card already drew the corner it wants. Versions of Windows
+    /// without the preference answer with a failure, which is why nothing is made of the
+    /// answer.
     /// </summary>
     private static void DisableSystemRounding(IntPtr handle)
     {
@@ -188,22 +181,6 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             return;
 
         Ask(handle, NativeMethods.DwmwcpDoNotRound);
-    }
-
-    /// <summary>
-    /// Asks the host for its own small corner radius. A companion card draws a radius wider
-    /// than the host's small one, so a host that grants the asking cuts air inside a corner
-    /// the card has already left transparent, and the two agree instead of disagreeing.
-    /// Asking is worth it on its own: a host that has been asked for a corner is a host
-    /// that has decided there is nothing to add of its own on top, which is the difference
-    /// between four corners of the application's and four of nobody's in particular.
-    /// </summary>
-    private static void AskForSmallRounding(IntPtr handle)
-    {
-        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000))
-            return;
-
-        Ask(handle, NativeMethods.DwmwcpRoundSmall);
     }
 
     private static void Ask(IntPtr handle, int preference)
@@ -214,76 +191,5 @@ public sealed class Win32OverlayChrome : IOverlayChrome
             NativeMethods.DwmwaWindowCornerPreference,
             ref value,
             sizeof(int));
-    }
-
-    /// <summary>
-    /// Cuts the window to the round rectangle the card inside it draws. Every other part of
-    /// a frameless window's corners is a request: Windows 11 rounds them whether anyone
-    /// asked or not, answers the asking not to on its own schedule, and settles the shape
-    /// again on every re-composition, which is how a window ends up with three corners of
-    /// the application's and one of the host's. A region is carried out rather than
-    /// answered, so it is applied on top of the request and settles all four corners at
-    /// once, whatever the host had made of the card underneath them.
-    ///
-    /// The cut is a pixel wider than the card on purpose. The region is a hard edge and
-    /// the card's corner is anti-aliased, so a region cut to the card exactly would shave
-    /// the card's own anti-aliasing away and leave every corner a fraction sharper than
-    /// the application drew it. Asked for one device pixel more it sits outside the card
-    /// and clips nothing but the corners a host added.
-    /// </summary>
-    private static void RoundWindowShape(IntPtr handle)
-    {
-        if (handle == IntPtr.Zero || !NativeMethods.IsWindow(handle))
-            return;
-
-        if (!NativeMethods.GetClientRect(handle, out var client))
-            return;
-
-        var width = client.Right - client.Left;
-        var height = client.Bottom - client.Top;
-        if (width <= 0 || height <= 0)
-            return;
-
-        var radius = ShapeRadius(
-            CompanionShape.CornerRadius,
-            NativeMethods.GetDpiForWindow(handle),
-            width,
-            height);
-
-        if (radius <= 0)
-            return;
-
-        var region = NativeMethods.CreateRoundRectRgn(0, 0, width, height, radius * 2, radius * 2);
-        if (region == IntPtr.Zero)
-            return;
-
-        // The window owns the region once it has taken it, so the handle is released only
-        // when the window refused it. A window that had no region of its own answers with
-        // nothing at all and no error, which is the ordinary answer rather than a failure.
-        if (NativeMethods.SetWindowRgn(handle, region, true) == 0 &&
-            Marshal.GetLastWin32Error() != 0)
-        {
-            _ = NativeMethods.DeleteObject(region);
-        }
-    }
-
-    /// <summary>
-    /// The corner radius the shape is cut at, in the device pixels a region is measured in.
-    /// The card draws in the window's layout units and the window's own scale is the only
-    /// bridge between the two, so the scale is crossed here rather than assumed: a desk at
-    /// 125% gives the card a quarter again as wide a corner, and a region cut at the layout
-    /// number would leave a corner square on one desk and twice over on another.
-    /// </summary>
-    internal static int ShapeRadius(int cornerRadius, uint dpi, int width, int height)
-    {
-        if (cornerRadius <= 0)
-            return 0;
-
-        var scale = dpi > 0 ? dpi / 96d : 1d;
-        var radius = (int)Math.Round(cornerRadius * scale) + 1;
-
-        // A window too small for the radius is cut to half of its shorter side rather than
-        // to nothing, and a window shorter than two pixels still gets a corner at all.
-        return Math.Clamp(radius, 1, Math.Max(1, Math.Min(width, height) / 2));
     }
 }

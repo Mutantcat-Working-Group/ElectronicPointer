@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -50,6 +51,12 @@ public sealed class SettingsWindow : Window
         _companion = new OverlayCompanion(_shell.Platform);
 
         Title = AppIdentity.GetDisplayName() + " 设置";
+        // The system title bar is the one corner the sheet cannot round: it caps the
+        // window in a square frame of the host's own, which leaves the top of a dialog
+        // built out of rounded cards the only square part of it. Dropping it puts the
+        // dialog on the same footing as the palette, and the sheet keeps a header of its
+        // own below carrying the name and the way out.
+        SystemDecorations = SystemDecorations.None;
         Width = 520;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.Manual;
@@ -100,7 +107,55 @@ public sealed class SettingsWindow : Window
 
         // The settings page scrolls when the capability list grows, and the status line stays
         // pinned below it, so a long failure message never pushes the buttons away.
+        // The frameless dialog keeps the header the title bar used to provide: the name on
+        // the left, the way out on the right, and the strip itself drags the window the way
+        // the palette's frame does. The caption stays out of hit testing so a press on the
+        // words drags too, and the button handles its own press, so only the bare strip
+        // arrives at the drag.
+        var closeButton = new Button
+        {
+            Content = "×",
+            Background = new SolidColorBrush(Color.Parse("#F2F4F7")),
+            BorderBrush = new SolidColorBrush(Color.Parse("#E3E7EC")),
+            BorderThickness = new Thickness(1),
+            Foreground = new SolidColorBrush(Color.Parse("#4A5058")),
+            FontSize = 14,
+            CornerRadius = new CornerRadius(6),
+            Width = 30,
+            Height = 30,
+            MinHeight = 30,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        closeButton.Click += (_, _) => Close();
+
+        var caption = new TextBlock
+        {
+            Text = "设置",
+            FontSize = 14,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = new SolidColorBrush(Color.Parse("#4A5058")),
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+        };
+
+        var headerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+        Grid.SetColumn(closeButton, 1);
+        headerGrid.Children.Add(caption);
+        headerGrid.Children.Add(closeButton);
+
+        var header = new Border
+        {
+            Background = new SolidColorBrush(Color.Parse("#F4F6F9")),
+            Padding = new Thickness(18, 12, 14, 8),
+            Child = headerGrid,
+        };
+        header.PointerPressed += OnHeaderPressed;
+
         var root = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(header, Dock.Top);
+        root.Children.Add(header);
         DockPanel.SetDock(_footerHost, Dock.Bottom);
         root.Children.Add(_footerHost);
         root.Children.Add(new ScrollViewer
@@ -127,6 +182,7 @@ public sealed class SettingsWindow : Window
         Opened += OnOpened;
         Closed += OnClosed;
         LayoutUpdated += OnLayoutUpdated;
+        KeyDown += OnKeyDown;
         // The dialog gets its chrome settled before the window manager composes it, for the
         // reason the palette does, and again after the resizes that settle its own height:
         // the host settles the corner shape once per frame change, and a handover that
@@ -148,6 +204,32 @@ public sealed class SettingsWindow : Window
         // the measured size stops moving, exactly like the palette it is placed against.
         LiftAboveOverlays();
         PlaceAbovePalette();
+    }
+
+    /// <summary>
+    /// Drags the dialog by its header, the way the palette is dragged by its frame. The
+    /// caption is kept out of hit testing so a press on the words drags as well, and the
+    /// close button handles its own press, so what arrives here is the bare strip.
+    /// </summary>
+    private void OnHeaderPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.Source is not Border)
+            return;
+
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        BeginMoveDrag(e);
+    }
+
+    /// <summary>Closes on Escape, the keyboard answer to the header's close button.</summary>
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
+            return;
+
+        Close();
+        e.Handled = true;
     }
 
     /// <summary>Called again after the canvases are rebuilt, which buries a window left behind.</summary>
