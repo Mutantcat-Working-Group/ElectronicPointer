@@ -15,9 +15,17 @@ public sealed class Win32ScreenCaptureService : IScreenCaptureService
 
     private readonly List<DisplayInfo> _displays = new();
 
+    // The callback fills this one in the order the driver reports the monitors, which is
+    // the order of the ports rather than the order of the desk. The public list is built
+    // from it once the enumeration is finished.
+    private readonly List<DisplayInfo> _staged = new();
+
     public Win32ScreenCaptureService()
     {
         NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, Enumerate, IntPtr.Zero);
+
+        foreach (var display in LeftToRight(_staged))
+            _displays.Add(display);
     }
 
     public bool IsSupported => _displays.Count > 0;
@@ -128,9 +136,11 @@ public sealed class Win32ScreenCaptureService : IScreenCaptureService
         var width = info.Monitor.Right - info.Monitor.Left;
         var height = info.Monitor.Bottom - info.Monitor.Top;
 
-        _displays.Add(new DisplayInfo(
-            _displays.Count,
+        _staged.Add(new DisplayInfo(
+            0,
             name,
+            info.Monitor.Left,
+            info.Monitor.Top,
             width,
             height,
             ReadScale(name),
@@ -138,6 +148,18 @@ public sealed class Win32ScreenCaptureService : IScreenCaptureService
 
         return true;
     }
+
+    /// <summary>
+    /// The monitors of the desk, numbered from the left. Two displays of one resolution are
+    /// indistinguishable by size alone, and the leftmost one always wins that comparison, so
+    /// the number has to mean the same place on every desk or the promise "monitor 2" makes
+    /// is a different monitor depending on which port it is plugged into.
+    /// </summary>
+    private static IEnumerable<DisplayInfo> LeftToRight(List<DisplayInfo> staged) =>
+        staged
+            .OrderBy(display => display.X)
+            .ThenBy(display => display.Y)
+            .Select((display, index) => display with { Index = index });
 
     /// <summary>
     /// Reads the dots per inch of one display. GetDeviceCaps wants a DC rather than an

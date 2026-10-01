@@ -251,6 +251,7 @@ public sealed class SettingsWindow : Window
         _autoStart.FontSize = 13;
         _autoStart.IsCheckedChanged += OnAutoStartChanged;
         panel.Children.Add(Row("开机启动", _autoStart));
+        panel.Children.Add(BuildFreezeDisplayRow());
         return panel;
     }
 
@@ -258,6 +259,72 @@ public sealed class SettingsWindow : Window
     {
         _shell.SetAutoStart(_autoStart.IsChecked == true);
     }
+
+    /// <summary>
+    /// Which display "freeze screen" reads. The index travelled in the configuration from
+    /// the start and nothing ever wrote it, so every grab landed on whatever the host
+    /// enumerated first, no matter which desk the user was annotating: this picker is
+    /// the way in. A host that cannot grab, or a desk with one screen, gets a worded
+    /// answer instead of a control that would pretend to choose.
+    /// </summary>
+    private Control BuildFreezeDisplayRow()
+    {
+        if (!_shell.CanFreezeScreen)
+            return Row("冻结显示器", Hint("当前平台无法抓取屏幕。"));
+
+        var displays = _shell.Platform.ScreenCapture.Displays;
+        if (displays.Count == 0)
+            return Row("冻结显示器", Hint("没有找到可抓取的显示器。"));
+
+        var picker = new ComboBox
+        {
+            FontSize = 13,
+            MinWidth = 240,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+
+        foreach (var display in displays)
+        {
+            var item = new ComboBoxItem
+            {
+                Content = DisplayLabel.Of(displays, display),
+                Tag = display.Index,
+            };
+            picker.Items.Add(item);
+        }
+
+        // The stored index is a display count ago stale after a monitor is unplugged, and
+        // the freeze path clamps the same way, so the picker lands on the display that
+        // will actually be grabbed rather than past the end of the list.
+        picker.SelectedIndex = Math.Clamp(_shell.Session.FrozenScreenIndex, 0, displays.Count - 1);
+        picker.SelectionChanged += OnFreezeDisplayChanged;
+        ToolTip.SetTip(picker, "「冻结屏幕」抓取哪台显示器的画面；墨迹落在对应的画布上");
+
+        return Row("冻结显示器", picker);
+    }
+
+    private void OnFreezeDisplayChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count == 0 || e.AddedItems[0] is not ComboBoxItem { Tag: int index })
+            return;
+
+        if (index == _shell.Session.FrozenScreenIndex)
+            return;
+
+        _shell.Session.FrozenScreenIndex = index;
+
+        // Written straight away rather than at close, the way autostart is: the desk may
+        // go away under a session that is about to be asked to shut down.
+        _shell.SaveConfiguration();
+    }
+
+    private static TextBlock Hint(string text) => new()
+    {
+        Text = text,
+        FontSize = 11,
+        Foreground = new SolidColorBrush(Color.Parse("#8A9099")),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
 
     private Control BuildFileSection()
     {

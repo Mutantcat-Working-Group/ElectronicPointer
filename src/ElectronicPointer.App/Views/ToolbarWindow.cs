@@ -375,7 +375,7 @@ public sealed class ToolbarWindow : Window
                 _shell.Session.PassThrough = _passThrough.IsChecked == true;
         };
 
-        _freezeButton = FlatButton(_freezeLabel, "抓取当前屏幕作为批注底图", OnFreezeToggled);
+        _freezeButton = FlatButton(_freezeLabel, FreezeHint(), OnFreezeToggled);
         _freezeButton.IsEnabled = _shell.CanFreezeScreen;
 
         _recognizeButton = FlatButton("识别墨迹", "把选中的笔迹整理成规范的直线、箭头、矩形、三角形或椭圆", OnRecognize);
@@ -491,6 +491,17 @@ public sealed class ToolbarWindow : Window
     private void SetTool(ToolKind tool)
     {
         _shell.Session.Tool = tool;
+    }
+
+    /// <summary>
+    /// What the grab button promises, and it names the display it reads: with several
+    /// monitors on the desk "current screen" points at whichever one the user is not
+    /// looking at, and the hint is the only place that can say which.
+    /// </summary>
+    private string FreezeHint()
+    {
+        var target = _shell.DescribeFreezeTarget();
+        return target is null ? "抓取当前屏幕作为批注底图" : $"抓取「{target}」作为批注底图";
     }
 
     /// <summary>
@@ -614,7 +625,7 @@ public sealed class ToolbarWindow : Window
         _freezeLabel.Text = frozen ? "取消冻结" : "冻结屏幕";
         ToolTip.SetTip(
             _freezeButton,
-            frozen ? "把冻结的底图撤掉，墨迹保留，撤销可以把它找回来" : "抓取当前屏幕作为批注底图");
+            frozen ? "把冻结的底图撤掉，墨迹保留，撤销可以把它找回来" : FreezeHint());
 
         ToolTip.SetTip(_undoButton, session.NextUndoLabel is { } undo ? $"撤销：{undo}" : "没有可撤销的操作");
         ToolTip.SetTip(_redoButton, session.NextRedoLabel is { } redo ? $"重做：{redo}" : "没有可重做的操作");

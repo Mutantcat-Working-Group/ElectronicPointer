@@ -139,10 +139,10 @@ public sealed class BoardSession
     }
 
     /// <summary>
-    /// Which display "freeze screen" grabs, as an index into the shell's list. Nothing in
-    /// the app writes it yet, so a grab always lands on the first display until there is a
-    /// way to point at a screen and say "this one"; it is persisted because the plumbing
-    /// survives the restart that will follow that feature.
+    /// Which display "freeze screen" grabs, as an index into the shell's list. The
+    /// settings sheet owns it through a picker that names every display, so a grab lands
+    /// on the desk the user actually annotates instead of whichever one the host
+    /// enumerates first. It is persisted, so the choice survives the restart.
     /// </summary>
     public int FrozenScreenIndex
     {

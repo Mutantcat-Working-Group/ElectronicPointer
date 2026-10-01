@@ -43,4 +43,52 @@ public sealed class Win32ScreenCaptureServiceTests
         Assert.Equal(display.Width * display.Height * 4, captured.Pixels.Length);
         Assert.Equal(display.Name, captured.DisplayName);
     }
+
+    [Fact]
+    public void DisplaysAreNumberedFromTheLeftAndCarryTheirPlaceOnTheDesk()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var displays = new Win32ScreenCaptureService().Displays;
+        if (displays.Count == 0)
+            return;
+
+        Assert.Equal(Enumerable.Range(0, displays.Count), displays.Select(display => display.Index));
+
+        // Left to right, top to bottom. The order the driver hands the monitors over in is
+        // the order of the ports, which on a desk with two identical screens says nothing
+        // about which one is on the left, and the number is all the user has to go on.
+        for (var i = 1; i < displays.Count; i++)
+        {
+            var previous = displays[i - 1];
+            var current = displays[i];
+
+            Assert.True(
+                (previous.X, previous.Y).CompareTo((current.X, current.Y)) < 0,
+                $"displays are out of order: {previous.X},{previous.Y} then {current.X},{current.Y}");
+        }
+
+        foreach (var display in displays)
+        {
+            Assert.True(display.Width > 0 && display.Height > 0, "a display without a size");
+            Assert.True(display.X >= 0 && display.Y >= 0, $"a display off the desk: {display.X},{display.Y}");
+        }
+    }
+
+    [Fact]
+    public void NoTwoDisplaysCarryTheSameRectangle()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var displays = new Win32ScreenCaptureService().Displays;
+
+        // The rectangle is the identity the freeze path matches on. Two entries sharing one
+        // would make that match a coin toss between them, which is the whole bug this
+        // exists to keep out.
+        Assert.Equal(
+            displays.Count,
+            displays.Select(display => (display.X, display.Y, display.Width, display.Height)).Distinct().Count());
+    }
 }

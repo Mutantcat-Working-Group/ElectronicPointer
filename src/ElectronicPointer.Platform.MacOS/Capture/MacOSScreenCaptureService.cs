@@ -167,6 +167,8 @@ public sealed class MacOSScreenCaptureService : IScreenCaptureService
             return false;
 
         var main = MacOSNativeMethods.CGMainDisplayID();
+        var staged = new List<DisplayInfo>();
+
         for (var i = 0; i < count; i++)
         {
             var id = ids[i];
@@ -177,8 +179,24 @@ public sealed class MacOSScreenCaptureService : IScreenCaptureService
             var width = pixelsWide > 0 ? (int)pixelsWide : (int)bounds.Width;
             var height = pixelsHigh > 0 ? (int)pixelsHigh : (int)bounds.Height;
 
-            _displays.Add(new DisplayInfo(i, id.ToString(), width, height, scale, id == main));
+            // CGDisplayBounds answers in points while the size above is pixels, so the
+            // origin is scaled by the same factor. A retina desk puts the second monitor a
+            // whole screen away in points but twice that in pixels, and comparing the two
+            // spaces against each other never matches.
+            var x = (int)Math.Round(bounds.X * scale);
+            var y = (int)Math.Round(bounds.Y * scale);
+
+            staged.Add(new DisplayInfo(0, id.ToString(), x, y, width, height, scale, id == main));
         }
+
+        // Numbered from the left, like the other platforms: the order the graphics card
+        // reports displays in has nothing to do with the desk they are arranged on, and a
+        // second display that sits to the left of the first should not be called "2".
+        foreach (var display in staged
+            .OrderBy(display => display.X)
+            .ThenBy(display => display.Y)
+            .Select((display, index) => display with { Index = index }))
+            _displays.Add(display);
 
         return true;
     }

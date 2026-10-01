@@ -12,6 +12,7 @@ using Mutantcat.ElectronicPointer.Core.Board;
 using Mutantcat.ElectronicPointer.Core.Geometry;
 using Mutantcat.ElectronicPointer.Core.Ink;
 using Mutantcat.ElectronicPointer.Core.Input;
+using Mutantcat.ElectronicPointer.Core.Screens;
 using Mutantcat.ElectronicPointer.Platform.Capture;
 using Mutantcat.ElectronicPointer.Platform.Displays;
 using Mutantcat.ElectronicPointer.Platform.Linux;
@@ -444,6 +445,23 @@ public sealed class OverlayShell : IDisposable
     }
 
     /// <summary>
+    /// The display the next freeze reads, in words, so the palette can name it where the
+    /// button promises to grab "the current screen": with several monitors on the desk
+    /// that phrase points at the wrong one, and the only honest answer is to say which.
+    /// Null when the host cannot grab at all, which the caller turns into the plain
+    /// description it had before.
+    /// </summary>
+    public string? DescribeFreezeTarget()
+    {
+        var displays = Platform.ScreenCapture.Displays;
+        if (displays.Count == 0)
+            return null;
+
+        var index = Math.Clamp(Session.FrozenScreenIndex, 0, displays.Count - 1);
+        return DisplayLabel.Of(displays, displays[index]);
+    }
+
+    /// <summary>
     /// Takes the frozen picture back off the active page and leaves the ink on it where
     /// it is. Freezing and unfreezing are one command with two directions, and until now
     /// only the first had a way in: the palette froze a screen and offered nothing back,
@@ -479,25 +497,28 @@ public sealed class OverlayShell : IDisposable
         if (screens.Count == 0)
             return true;
 
-        // Index first, because both lists report displays the way the OS orders them, and
-        // size as the fallback, because a capture backend and Avalonia do enumerate
-        // independently. Either way a grab taken on the monitor to the right must land on
-        // the right, which is what the size test protects.
-        var byIndex = Session.FrozenScreenIndex >= 0 && Session.FrozenScreenIndex < screens.Count
-            ? screens[Session.FrozenScreenIndex]
-            : null;
+        var placements = new ScreenPlacement[screens.Count];
+        for (var i = 0; i < screens.Count; i++)
+            placements[i] = PlacementOf(screens[i]);
 
-        // The lambda cannot capture an "out" parameter, so the display is copied first.
-        var targetDisplay = display;
-        screen = byIndex is { } indexed && SameSize(indexed, targetDisplay)
-            ? indexed
-            : screens.FirstOrDefault(s => SameSize(s, targetDisplay));
+        var resolved = ScreenTarget.IndexFor(placements, PlacementOf(display), Session.FrozenScreenIndex);
+        screen = resolved >= 0 ? screens[resolved] : null;
 
         return true;
     }
 
-    private static bool SameSize(Screen screen, DisplayInfo display) =>
-        screen.Bounds.Width == display.Width && screen.Bounds.Height == display.Height;
+    /// <summary>
+    /// Where a capture display sits, in the pixels the capture service counts in.
+    /// </summary>
+    private static ScreenPlacement PlacementOf(DisplayInfo display) =>
+        new(display.X, display.Y, display.Width, display.Height);
+
+    /// <summary>
+    /// Where an Avalonia screen sits. A screen's bounds are already device pixels, which is
+    /// the same unit the capture services report, so the two are compared as they come.
+    /// </summary>
+    private static ScreenPlacement PlacementOf(Screen screen) =>
+        new(screen.Bounds.X, screen.Bounds.Y, screen.Bounds.Width, screen.Bounds.Height);
 
     /// <summary>
     /// Exports the current page as a picture and says what happened, because the caller is

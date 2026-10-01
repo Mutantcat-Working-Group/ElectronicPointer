@@ -232,6 +232,8 @@ public sealed class X11ScreenCaptureService : IScreenCaptureService
                 screens.Add(new DisplayInfo(
                     0,
                     LinuxSession.DisplayName ?? "X11",
+                    0,
+                    0,
                     width,
                     height,
                     scale,
@@ -265,7 +267,7 @@ public sealed class X11ScreenCaptureService : IScreenCaptureService
         try
         {
             var stride = Marshal.SizeOf<X11NativeMethods.XineramaScreenInfo>();
-            var found = new List<(DisplayInfo Display, int X, int Y)>();
+            var found = new List<DisplayInfo>();
 
             for (var i = 0; i < count; i++)
             {
@@ -273,13 +275,15 @@ public sealed class X11ScreenCaptureService : IScreenCaptureService
                 if (monitor.Width <= 0 || monitor.Height <= 0)
                     continue;
 
-                found.Add((new DisplayInfo(
+                found.Add(new DisplayInfo(
                     found.Count,
                     $"显示器 {found.Count + 1}",
+                    monitor.XOrg,
+                    monitor.YOrg,
                     monitor.Width,
                     monitor.Height,
                     scale,
-                    monitor.ScreenNumber == 0), monitor.XOrg, monitor.YOrg));
+                    monitor.ScreenNumber == 0));
             }
 
             if (found.Count == 0)
@@ -291,17 +295,15 @@ public sealed class X11ScreenCaptureService : IScreenCaptureService
             return found
                 .OrderBy(monitor => monitor.X)
                 .ThenBy(monitor => monitor.Y)
-                .Select((monitor, index) =>
-                {
-                    var (display, _, _) = monitor;
-                    return new DisplayInfo(
-                        index,
-                        display.Name,
-                        display.Width,
-                        display.Height,
-                        display.ScaleFactor,
-                        index == 0);
-                })
+                .Select((monitor, index) => new DisplayInfo(
+                    index,
+                    monitor.Name,
+                    monitor.X,
+                    monitor.Y,
+                    monitor.Width,
+                    monitor.Height,
+                    monitor.ScaleFactor,
+                    index == 0))
                 .ToList();
         }
         finally
