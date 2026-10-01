@@ -305,7 +305,7 @@ public sealed class SettingsWindow : Window
         {
             Title = "保存批注",
             DefaultExtension = "epboard",
-            SuggestedFileName = "电子教鞭批注.epboard",
+            SuggestedFileName = $"{AppIdentity.ChineseName}批注-{DateTime.Now:yyyyMMdd-HHmmss}.epboard",
             FileTypeChoices = new[]
             {
                 new FilePickerFileType("电子教鞭批注") { Patterns = new[] { "*.epboard" } },

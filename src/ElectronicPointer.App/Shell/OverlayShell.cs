@@ -444,6 +444,21 @@ public sealed class OverlayShell : IDisposable
     }
 
     /// <summary>
+    /// Takes the frozen picture back off the active page and leaves the ink on it where
+    /// it is. Freezing and unfreezing are one command with two directions, and until now
+    /// only the first had a way in: the palette froze a screen and offered nothing back,
+    /// which left a grab taken on the wrong monitor sitting behind every later stroke
+    /// until the page was wiped. Undo brings the picture back if it was wanted after all.
+    /// </summary>
+    public void UnfreezeScreen()
+    {
+        if (!Session.IsFrozen)
+            return;
+
+        Session.Freeze(null);
+    }
+
+    /// <summary>
     /// The display to grab, plus the screen Avalonia thinks lives there. The capture
     /// service and Avalonia enumerate displays independently, so the two are matched by
     /// size: a grab taken on the monitor to the right has to land on the right.
@@ -498,7 +513,10 @@ public sealed class OverlayShell : IDisposable
         {
             Title = "保存标注图片",
             DefaultExtension = "png",
-            SuggestedFileName = "电子教鞭批注.png",
+            // The minute stamp keeps a second export from taking the first one's place,
+            // which a bare name does silently: the dialog opens on the same name every
+            // time and a user who presses through it overwrites yesterday's picture.
+            SuggestedFileName = $"{AppIdentity.ChineseName}批注-{DateTime.Now:yyyyMMdd-HHmmss}.png",
             FileTypeChoices = new[]
             {
                 new Avalonia.Platform.Storage.FilePickerFileType("PNG 图片")

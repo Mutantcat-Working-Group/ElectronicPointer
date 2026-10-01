@@ -171,6 +171,13 @@ public sealed class BoardSession
 
     public string PageName => Document.Pages.Count == 0 ? string.Empty : Document.ActivePage.Name;
 
+    /// <summary>
+    /// Whether the active page carries a frozen-screen picture under its ink. The palette
+    /// reads this to tell its grab button which way the next press goes, and it is the
+    /// active page because the freeze command is: two pages, two answers.
+    /// </summary>
+    public bool IsFrozen => ActivePage.BackgroundImage is not null;
+
     public bool CanUndo => _history.CanUndo;
 
     public bool CanRedo => _history.CanRedo;

@@ -37,6 +37,9 @@ public sealed class ToolbarWindow : Window
     // assignment keeps the non-null contract without pretending they are immutable.
     private Button _undoButton = null!;
     private Button _redoButton = null!;
+    // The freeze button is a toggle, so the words on it are the state of the page rather
+    // than a label fixed at build time: they live in a block that Refresh() rewrites.
+    private readonly TextBlock _freezeLabel = new() { FontSize = 13 };
     private readonly ToggleSwitch _passThrough = new();
     private Button _freezeButton = null!;
     private Button _recognizeButton = null!;
@@ -367,7 +370,7 @@ public sealed class ToolbarWindow : Window
                 _shell.Session.PassThrough = _passThrough.IsChecked == true;
         };
 
-        _freezeButton = FlatButton("冻结屏幕", "抓取当前屏幕作为批注底图", () => _shell.FreezeScreen());
+        _freezeButton = FlatButton(_freezeLabel, "抓取当前屏幕作为批注底图", OnFreezeToggled);
         _freezeButton.IsEnabled = _shell.CanFreezeScreen;
 
         _recognizeButton = FlatButton("识别墨迹", "把选中的笔迹整理成规范的直线、箭头、矩形、三角形或椭圆", OnRecognize);
@@ -458,10 +461,13 @@ public sealed class ToolbarWindow : Window
     };
 
     private Button FlatButton(string text, string? hint, Action action)
+        => FlatButton(new TextBlock { Text = text, FontSize = 13 }, hint, action);
+
+    private Button FlatButton(Control content, string? hint, Action action)
     {
         var button = new Button
         {
-            Content = new TextBlock { Text = text, FontSize = 13 },
+            Content = content,
             Background = new SolidColorBrush(Color.Parse("#F2F4F7")),
             BorderBrush = new SolidColorBrush(Color.Parse("#E3E7EC")),
             BorderThickness = new Thickness(1),
@@ -480,6 +486,30 @@ public sealed class ToolbarWindow : Window
     private void SetTool(ToolKind tool)
     {
         _shell.Session.Tool = tool;
+    }
+
+    /// <summary>
+    /// The one grab button, both ways: it puts a frozen screen under the ink and takes it
+    /// back off. Taking it off had no way in at all until now, so a user who froze the
+    /// wrong screen had nothing to press but undo, or wipe the page.
+    /// </summary>
+    private void OnFreezeToggled()
+    {
+        if (_shell.Session.IsFrozen)
+        {
+            _shell.UnfreezeScreen();
+            ShowStatus("已取消冻结");
+            return;
+        }
+
+        _shell.FreezeScreen();
+
+        // A host that cannot grab leaves the page unfrozen, and the status line is where
+        // that shows up, rather than a button that quietly did nothing.
+        if (_shell.Session.IsFrozen)
+            ShowStatus("已冻结屏幕，现在可以直接在底图上书写。");
+        else
+            ShowStatus("当前平台无法抓取屏幕。");
     }
 
     private async void OnRecognize()
@@ -571,7 +601,15 @@ public sealed class ToolbarWindow : Window
         _undoButton.IsEnabled = session.CanUndo;
         _redoButton.IsEnabled = session.CanRedo;
         _passThrough.IsChecked = session.PassThrough;
-        _freezeButton.IsEnabled = _shell.CanFreezeScreen;
+        // Taking a picture off is possible on a host that cannot put one under, so the
+        // button only goes dead when the page has nothing frozen and nothing to grab.
+        _freezeButton.IsEnabled = _shell.CanFreezeScreen || _shell.Session.IsFrozen;
+
+        var frozen = _shell.Session.IsFrozen;
+        _freezeLabel.Text = frozen ? "取消冻结" : "冻结屏幕";
+        ToolTip.SetTip(
+            _freezeButton,
+            frozen ? "把冻结的底图撤掉，墨迹保留，撤销可以把它找回来" : "抓取当前屏幕作为批注底图");
 
         ToolTip.SetTip(_undoButton, session.NextUndoLabel is { } undo ? $"撤销：{undo}" : "没有可撤销的操作");
         ToolTip.SetTip(_redoButton, session.NextRedoLabel is { } redo ? $"重做：{redo}" : "没有可重做的操作");
