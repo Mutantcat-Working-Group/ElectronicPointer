@@ -48,6 +48,17 @@ public sealed class ToolbarWindow : Window
     private DispatcherTimer? _statusTimer;
     private bool _refreshing;
 
+    // The palette is shown by the layout pass that learns how tall it is, not by the opening
+    // itself. SizeToContent means the height the first placement has to work with is a
+    // default the window never keeps: placing on it draws the card a few hundred pixels
+    // above where it belongs and then redraws it lower, and the frame between the two is
+    // what the eye reads as a corner that does not agree with the other three. Staying
+    // hidden until that pass keeps the card off the screen for the whole of the jump, so
+    // the user sees it once, in place, with four matching corners.
+    private bool _revealed;
+    private DispatcherTimer? _revealTimer;
+    private Rect _lastLayoutBounds;
+
     // The palette travels with the canvases rather than being one of them, so it needs the
     // same lift they are given before it can be clicked at all.
     private readonly OverlayCompanion _companion = null!;
@@ -158,7 +169,7 @@ public sealed class ToolbarWindow : Window
         // AppKit both show because they map the window before that pass runs.
         LayoutUpdated += OnLayoutUpdated;
         LiftAboveOverlays();
-        Opacity = 1;
+        ArmRevealFallback();
     }
 
     /// <summary>
@@ -181,8 +192,93 @@ public sealed class ToolbarWindow : Window
 
     private void OnLayoutUpdated(object? sender, EventArgs e)
     {
+        var bounds = Bounds;
+
+        // A palette that has not been measured has not been placed either: the height the
+        // first placement has to work with is a default the window never keeps, and a card
+        // drawn at that height is drawn in one place and then in another one lower down.
+        // Waiting for the pass that carries the content-sized height keeps that second
+        // drawing off the screen altogether. A pass that repeats a size already seen is the
+        // end of the resizing, which is the same moment.
+        if (!Settled(bounds) && bounds != _lastLayoutBounds)
+        {
+            _lastLayoutBounds = bounds;
+            return;
+        }
+
         LayoutUpdated -= OnLayoutUpdated;
+        Reveal();
+    }
+
+    /// <summary>
+    /// Whether the window now has the size its content asks for, which is the moment
+    /// <see cref="SizeToContent"/> has been carried out and a position computed from the
+    /// window's own size no longer has to be computed again.
+    /// </summary>
+    private bool Settled(Rect bounds)
+    {
+        if (bounds.Height <= 0 || Content is not Layoutable content)
+            return false;
+
+        var desired = content.DesiredSize.Height;
+        return desired > 0 && Math.Abs(bounds.Height - desired) <= 1;
+    }
+
+    /// <summary>
+    /// The size a placement is computed from. The window's bounds carry a default size until
+    /// the host has resized it to the content, and a position computed from that is one the
+    /// palette never actually sits in; the content's own measurement is the size the window
+    /// is on its way to, so it is the one to place by while the two disagree.
+    /// </summary>
+    private Size PlacementSize()
+    {
+        var width = Bounds.Width;
+        var height = Bounds.Height;
+
+        if (Content is Layoutable content)
+        {
+            var desired = content.DesiredSize;
+            if (desired.Width > 0 && Math.Abs(width - desired.Width) > 1)
+                width = desired.Width;
+            if (desired.Height > 0 && Math.Abs(height - desired.Height) > 1)
+                height = desired.Height;
+        }
+
+        return new Size(width > 0 ? width : Width, height > 0 ? height : 80);
+    }
+
+    /// <summary>
+    /// Lets the card be seen, at the position the settled height puts it in. Both halves of
+    /// that happen once; the guard is what keeps a layout pass that arrives after the reveal
+    /// from hiding the card again by moving it under a height that has since changed.
+    /// </summary>
+    private void Reveal()
+    {
+        if (_revealed)
+            return;
+
+        _revealed = true;
+
+        if (_revealTimer is not null)
+        {
+            _revealTimer.Stop();
+            _revealTimer = null;
+        }
+
         Position = PreferredPosition();
+        Opacity = 1;
+    }
+
+    /// <summary>
+    /// Insurance against a host that never runs a layout pass on a window that is already
+    /// open. A palette that stays invisible forever is a far worse outcome than one shown at
+    /// a height measured a moment before it was known, so the fallback only ever reveals.
+    /// </summary>
+    private void ArmRevealFallback()
+    {
+        _revealTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(900) };
+        _revealTimer.Tick += (_, _) => Reveal();
+        _revealTimer.Start();
     }
 
     /// <summary>
@@ -200,14 +296,16 @@ public sealed class ToolbarWindow : Window
         {
             // A screen that will not describe itself is measured on a plain 1920x1080
             // desk, which is the closest thing to a default there is.
-            var plainWidth = (int)Math.Round(Bounds.Width > 0 ? Bounds.Width : Width);
-            var plainHeight = (int)Math.Round(Bounds.Height > 0 ? Bounds.Height : 80);
+            var plain = PlacementSize();
+            var plainWidth = (int)Math.Round(plain.Width);
+            var plainHeight = (int)Math.Round(plain.Height);
             return new PixelPoint(Math.Max(0, (1920 - plainWidth) / 2), 1080 - plainHeight - 48);
         }
 
         var scale = screen.Scaling > 0 ? screen.Scaling : 1d;
-        var width = (int)Math.Round((Bounds.Width > 0 ? Bounds.Width : Width) * scale);
-        var height = (int)Math.Round((Bounds.Height > 0 ? Bounds.Height : 80) * scale);
+        var size = PlacementSize();
+        var width = (int)Math.Round(size.Width * scale);
+        var height = (int)Math.Round(size.Height * scale);
 
         var area = screen.WorkingArea;
         var x = area.X + Math.Max(0, (area.Width - width) / 2);
