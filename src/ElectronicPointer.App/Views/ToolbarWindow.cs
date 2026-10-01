@@ -89,7 +89,9 @@ public sealed class ToolbarWindow : Window
         // whatever the window manager then does to a frameless window (Windows 11 rounds
         // them on its own, older systems do not) lands on top of what the application drew,
         // so no two corners end up agreeing. Letting the window stay transparent hands all
-        // four corners to the card, which is the same thing the ink canvas does.
+        // four corners to the card, which is the same thing the ink canvas does, and the
+        // radius the card draws is handed to the host as well so it can cut the window to
+        // match instead of deciding the shape for itself.
         Background = Brushes.Transparent;
         TransparencyLevelHint = new[] { WindowTransparencyLevel.Transparent };
 
@@ -98,7 +100,7 @@ public sealed class ToolbarWindow : Window
             Background = new SolidColorBrush(Color.Parse("#FFFFFF")),
             BorderBrush = new SolidColorBrush(Color.Parse("#D7DCE3")),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(CompanionShape.CornerRadius),
             Padding = new Thickness(10, 8),
             Child = _groups,
         };

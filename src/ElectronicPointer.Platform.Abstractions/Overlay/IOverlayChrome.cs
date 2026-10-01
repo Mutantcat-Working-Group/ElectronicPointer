@@ -58,3 +58,22 @@ public interface IOverlayChrome
 
     bool SetHiddenFromSwitcher(bool hidden);
 }
+
+/// <summary>
+/// The shape a companion window draws around itself, in the layout units the window is
+/// built in. A host that decides the corners of a frameless window on its own cannot be
+/// argued with by drawing: a native handle answers no question about what the
+/// application painted inside it, so the only way to stop a host from rounding a corner
+/// the application drew square, or squaring one it drew round, is to tell the host the
+/// radius and let it cut the same window the application drew.
+/// </summary>
+public static class CompanionShape
+{
+    /// <summary>
+    /// The radius every companion window draws on all four of its corners. The card and
+    /// the host are cut from this one number so the two cannot drift apart: a radius that
+    /// appears in the card and not here leaves a corner the host cut to a shape the
+    /// application never drew.
+    /// </summary>
+    public const int CornerRadius = 8;
+}

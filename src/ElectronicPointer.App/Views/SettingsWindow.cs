@@ -84,7 +84,7 @@ public sealed class SettingsWindow : Window
             Background = new SolidColorBrush(Color.Parse("#FFFFFF")),
             BorderBrush = new SolidColorBrush(Color.Parse("#D7DCE3")),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(CompanionShape.CornerRadius),
             Padding = new Thickness(4),
             Child = page,
         };
@@ -114,12 +114,13 @@ public sealed class SettingsWindow : Window
         // The sheet is the window's own shape now, so it is the thing that carries the
         // rounding: the card inside is already rounded, but it sits four pixels in, which
         // leaves the window's corners to whatever the host decides to do with them.
+        // The radius is the one every companion window draws, and the host is told it too.
         Content = new Border
         {
             Background = new SolidColorBrush(Color.Parse("#F4F6F9")),
             BorderBrush = new SolidColorBrush(Color.Parse("#D7DCE3")),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = new CornerRadius(CompanionShape.CornerRadius),
             Child = root,
         };
 

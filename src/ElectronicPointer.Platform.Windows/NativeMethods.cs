@@ -40,10 +40,20 @@ internal static partial class NativeMethods
     // the corners of a frameless window whether the application asked for it or not.
     public const int DwmwaWindowCornerPreference = 33;
 
-    // DWM_WINDOW_CORNER_PREFERENCE: 0 default, 1 do not round, 2 round, 3 round small.
-    // Two is the value that asks for the system's rounding, so 1 is the only one that
-    // keeps the application's own corners on the screen.
-    public const int DwmwcpDoNotRound = 1;
+    // DWM_WINDOW_CORNER_PREFERENCE. The numbering is not in the order the names come in:
+    // 0 default, 1 round, 2 do not round, 3 round small. Asking a host to keep its hands
+    // off with 1 hands it the opposite instruction, which is how a host ends up adding a
+    // corner radius of its own to a window that already drew one.
+    public const int DwmwcpDefault = 0;
+
+    public const int DwmwcpRound = 1;
+
+    public const int DwmwcpDoNotRound = 2;
+
+    // The host's own small radius. A companion card draws a radius of its own wider than
+    // this one, so a host asked for a small corner cuts air inside a corner the card has
+    // already left transparent, and the two agree instead of overlapping.
+    public const int DwmwcpRoundSmall = 3;
 
     public const int SmXVirtualScreen = 76;
     public const int SmYVirtualScreen = 77;
@@ -202,6 +212,33 @@ internal static partial class NativeMethods
     [DllImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DeleteObject(IntPtr handle);
+
+    // The window's own scale. A region is measured in device pixels and the cards the
+    // windows draw are measured in layout units, so the radius crosses that scale here.
+    [DllImport("user32.dll")]
+    public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetClientRect(IntPtr hwnd, out Rect rect);
+
+    // Width and height are the size of the ellipse each corner is a quarter of, so a
+    // corner of radius r is asked for with twice r, and the right and bottom edges are
+    // the far side of the last pixel rather than one past it.
+    [DllImport("gdi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr CreateRoundRectRgn(
+        int left,
+        int top,
+        int right,
+        int bottom,
+        int width,
+        int height);
+
+    // The window takes the region over once it accepts it, which is why the caller only
+    // releases the handle when the window refused it. What comes back is the region the
+    // window had before, which is nothing at all for a window that never had one.
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern int SetWindowRgn(IntPtr hwnd, IntPtr region, [MarshalAs(UnmanagedType.Bool)] bool redraw);
 
     [DllImport("gdi32.dll")]
     public static extern IntPtr CreateDIBSection(IntPtr hdc, ref BitmapInfo info, uint usage, out IntPtr bits, IntPtr section, uint offset);
