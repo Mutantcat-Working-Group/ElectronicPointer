@@ -52,7 +52,7 @@ public sealed class SettingsWindow : Window
         Title = AppIdentity.GetDisplayName() + " 设置";
         Width = 520;
         SizeToContent = SizeToContent.Height;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        WindowStartupLocation = WindowStartupLocation.Manual;
         CanResize = false;
         RequestedThemeVariant = ThemeVariant.Light;
         // The dialog's shape is the sheet below and nothing else, and for the same reason as
@@ -125,10 +125,12 @@ public sealed class SettingsWindow : Window
 
         Opened += OnOpened;
         Closed += OnClosed;
+        LayoutUpdated += OnLayoutUpdated;
         // The dialog gets its chrome settled before the window manager composes it, for the
-        // reason the palette does; otherwise the host's idea of the corner shape arrives a
-        // frame late and only some of it sticks.
-        this.ApplyChromeBeforeFirstShow(LiftAboveOverlays);
+        // reason the palette does, and again after the resizes that settle its own height:
+        // the host settles the corner shape once per frame change, and a handover that
+        // arrives earlier than that is answered with rather than carried out.
+        this.KeepChromeCurrent(LiftAboveOverlays);
     }
 
     private readonly StackPanel _footerHost;
@@ -138,7 +140,14 @@ public sealed class SettingsWindow : Window
     /// way the palette is lifted. Windows put an ordinary window below every topmost canvas,
     /// and AppKit stacks strictly by level, so without this the dialog is simply not there.
     /// </summary>
-    private void OnOpened(object? sender, EventArgs e) => LiftAboveOverlays();
+    private void OnOpened(object? sender, EventArgs e)
+    {
+        // SizeToContent only settles the real height once the window is on screen, so this
+        // placement is a first estimate, and the layout passes that follow repeat it until
+        // the measured size stops moving, exactly like the palette it is placed against.
+        LiftAboveOverlays();
+        PlaceAbovePalette();
+    }
 
     /// <summary>Called again after the canvases are rebuilt, which buries a window left behind.</summary>
     internal void LiftAboveOverlays() => _companion.Lift(this, CompanionRole.Dialog);
@@ -365,6 +374,84 @@ public sealed class SettingsWindow : Window
         }
 
         return note;
+    }
+
+    private void OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        // SizeToContent settles the real height over more than one pass, and the cap the
+        // room above the palette asks for changes it again, so this repeats until the
+        // measured size stops moving. A size that has stopped is the geometry the sheet
+        // will actually show, and that is the only geometry worth placing against.
+        var size = Bounds.Size;
+        if (Math.Abs(size.Width - _placedSize.Width) < 0.5 && Math.Abs(size.Height - _placedSize.Height) < 0.5)
+            return;
+
+        PlaceAbovePalette();
+    }
+
+    /// <summary>Physical pixels of air kept between the sheet and the palette below it.</summary>
+    private const int GapPixels = 24;
+
+    /// <summary>Room above the palette below which the sheet takes the middle of the desk instead.</summary>
+    private const int MinimumRoomPixels = 320;
+
+    private Size _placedSize = new Size(double.NaN, double.NaN);
+
+    /// <summary>
+    /// Opens the sheet over the palette that asked for it, both centred on the same axis,
+    /// so the palette and its buttons stay visible while the settings are being changed. A
+    /// centred-on-the-desk dialog covers that palette entirely, which for a window lifted
+    /// over ink means the only thing the user can reach is the dialog. The sheet is capped
+    /// to the room above the palette and its page scrolls, so a long capability report
+    /// never has to be shown by covering the very thing it reports on.
+    /// </summary>
+    private void PlaceAbovePalette()
+    {
+        var palette = _shell.Toolbar;
+        var screen = Screens?.All.FirstOrDefault(s => s.IsPrimary) ?? Screens?.All.FirstOrDefault();
+        if (palette is null || screen is null)
+            return;
+
+        var area = screen.WorkingArea;
+        var scale = screen.Scaling > 0 ? screen.Scaling : 1d;
+
+        // The desk and the palette are counted in physical pixels, and the sheet is built
+        // in the layout units its own screen was designed around, so every measure of the
+        // sheet crosses the scale factor once, here, rather than half way through the
+        // arithmetic, which is what left a sheet at 125% hanging off the bottom of a desk
+        // it was meant to sit on.
+        var width = Math.Max(1, (int)Math.Round((Bounds.Width > 0 ? Bounds.Width : Width) * scale));
+        var height = Math.Max(1, (int)Math.Round((Bounds.Height > 0 ? Bounds.Height : 600) * scale));
+        var paletteWidth = Math.Max(1, (int)Math.Round((palette.Bounds.Width > 0 ? palette.Bounds.Width : 800) * scale));
+        var paletteTop = palette.Position.Y;
+
+        // The room is what sits above the palette inside the desk, and the palette is the
+        // one thing the sheet may not cover: it is where the user was a moment ago, and
+        // its buttons are the ones the sheet is here to change the behaviour of.
+        var room = paletteTop - GapPixels - area.Y;
+
+        // A palette parked high enough up that the room over it is not worth living in
+        // leaves the sheet the middle of the desk, which is the most of it any placement
+        // can show at once.
+        var centred = room < MinimumRoomPixels;
+        var cap = centred ? Math.Max(1, area.Height) : Math.Max(1, room);
+
+        // A sheet taller than the room it is given is capped to that room and the page
+        // inside scrolls, so it never covers the palette it came from and never leaves the
+        // desk. The cap changes the measured height, and the size that comes back is what
+        // this places against, so the cap goes in first and the layout pass repeats this.
+        MaxHeight = cap / scale;
+
+        var x = palette.Position.X + (paletteWidth - width) / 2;
+        var y = centred
+            ? area.Y + Math.Max(0, (area.Height - height) / 2)
+            : paletteTop - GapPixels - height;
+
+        Position = new PixelPoint(
+            Math.Min(Math.Max(x, area.X), Math.Max(area.X, area.Right - width)),
+            Math.Min(Math.Max(y, area.Y), Math.Max(area.Y, area.Bottom - height)));
+
+        _placedSize = Bounds.Size;
     }
 
     private static Control CapabilityRow(string label, bool supported, string? note)

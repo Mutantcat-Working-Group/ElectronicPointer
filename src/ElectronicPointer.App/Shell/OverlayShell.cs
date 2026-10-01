@@ -73,6 +73,11 @@ public sealed class OverlayShell : IDisposable
     /// </summary>
     public Window MainWindow { get; private set; } = null!;
 
+    /// <summary>
+    /// The palette as it stands, so a window that opens from it can be placed against it
+    /// rather than against the screen: a dialog centred on the desk covers the palette it
+    /// was opened from, and the buttons the user was about to press go with it.
+    /// </summary>
     public ToolbarWindow? Toolbar => _toolbar;
 
     public bool CanFreezeScreen => Platform.ScreenCapture.IsSupported;

@@ -116,11 +116,13 @@ public sealed class ToolbarWindow : Window
 
         Opened += OnOpened;
         // Windows 11 decides the shape of a frameless window the first time it composes one
-        // and leaves a corner it has already decided alone afterwards, so refusing its
-        // rounding has to happen while the native handle exists and the window is still
-        // hidden: OnOpened arrives once that shape is already settled. Everything asked for
-        // here is applied again in OnOpened, which is where the z-order lives.
-        this.ApplyChromeBeforeFirstShow(LiftAboveOverlays);
+        // and decides it again after every frame change, so refusing its rounding has to
+        // happen while the native handle exists and the window is still hidden, and once
+        // more after the layout that settles the palette's height: this palette sizes itself
+        // to its content and grows by a resize, which is exactly the frame change that
+        // settles the corners a second time. OnOpened is where the z-order lives, and the
+        // resizes keep the corner shape from being left to the host on their own.
+        this.KeepChromeCurrent(LiftAboveOverlays);
         Refresh();
     }
 
@@ -130,7 +132,13 @@ public sealed class ToolbarWindow : Window
         // first frame is invisible and the palette is placed before it becomes visible.
         var screen = Screens?.All.FirstOrDefault(s => s.IsPrimary) ?? Screens?.All.FirstOrDefault();
         if (screen is not null)
-            MaxWidth = Math.Max(MinWidth, screen.WorkingArea.Width - 48);
+        {
+            // The desk is counted in physical pixels and the palette is built in layout
+            // units, so the cap crosses the screen's scale factor here. Without it a desk
+            // at 125% is given a cap a quarter wider than the desk itself.
+            var scale = screen.Scaling > 0 ? screen.Scaling : 1d;
+            MaxWidth = Math.Max(MinWidth, screen.WorkingArea.Width / scale - 48);
+        }
 
         Position = PreferredPosition();
         // The height that placement was computed from is still the pre-layout default
@@ -167,15 +175,29 @@ public sealed class ToolbarWindow : Window
         Position = PreferredPosition();
     }
 
-    /// <summary>Bottom centre of the primary screen's usable area, clamped so the whole palette stays on screen.</summary>
+    /// <summary>
+    /// Bottom centre of the primary screen's usable area, clamped so the whole palette stays
+    /// on screen. The desk is counted in physical pixels and the palette is built in the
+    /// layout units its own screen was designed around, so the palette's size crosses that
+    /// screen's scale factor here. Measured in layout units instead, a palette on a desk at
+    /// 125% lands short of the centre by the amount the scale adds, and its bottom edge
+    /// ends up under the desk rather than sitting above it.
+    /// </summary>
     private PixelPoint PreferredPosition()
     {
         var screen = Screens?.All.FirstOrDefault(s => s.IsPrimary) ?? Screens?.All.FirstOrDefault();
-        var width = (int)Math.Round(Bounds.Width > 0 ? Bounds.Width : Width);
-        var height = (int)Math.Round(Bounds.Height > 0 ? Bounds.Height : 80);
-
         if (screen is null)
-            return new PixelPoint(Math.Max(0, (1920 - width) / 2), 1080 - height - 48);
+        {
+            // A screen that will not describe itself is measured on a plain 1920x1080
+            // desk, which is the closest thing to a default there is.
+            var plainWidth = (int)Math.Round(Bounds.Width > 0 ? Bounds.Width : Width);
+            var plainHeight = (int)Math.Round(Bounds.Height > 0 ? Bounds.Height : 80);
+            return new PixelPoint(Math.Max(0, (1920 - plainWidth) / 2), 1080 - plainHeight - 48);
+        }
+
+        var scale = screen.Scaling > 0 ? screen.Scaling : 1d;
+        var width = (int)Math.Round((Bounds.Width > 0 ? Bounds.Width : Width) * scale);
+        var height = (int)Math.Round((Bounds.Height > 0 ? Bounds.Height : 80) * scale);
 
         var area = screen.WorkingArea;
         var x = area.X + Math.Max(0, (area.Width - width) / 2);
